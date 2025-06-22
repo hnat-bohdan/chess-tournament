@@ -1,0 +1,6 @@
+--- 22/06/25 12:55:14 | Current Pairings for Round 2 / 5 ---
+Round 2 ID: 1 | Hikaru Nakamura (1.0 points)  -  Gukesh D (1.0 points)
+Round 2 ID: 2 | Wesley So (1.0 points)  -  Nodirbek Abdusattorov (1.0 points)
+Round 2 ID: 3 | Ian Nepomniachtchi (0.5 points)  -  Magnus Carlsen (0.0 points)
+Round 2 ID: 4 | Fabiano Caruana (0.5 points)  -  Ding Liren (0.0 points)
+Round 2 ID: 5 | Alireza Firouzja (0.0 points)  -  Arjun Erigaisi (0.0 points)

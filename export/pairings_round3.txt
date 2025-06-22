@@ -1,0 +1,6 @@
+--- 22/06/25 12:55:14 | Current Pairings for Round 3 / 5 ---
+Round 3 ID: 1 | Hikaru Nakamura (2.0 points)  -  Wesley So (2.0 points)
+Round 3 ID: 2 | Ian Nepomniachtchi (1.5 points)  -  Gukesh D (1.0 points)
+Round 3 ID: 3 | Fabiano Caruana (1.5 points)  -  Nodirbek Abdusattorov (1.0 points)
+Round 3 ID: 4 | Alireza Firouzja (0.5 points)  -  Magnus Carlsen (0.0 points)
+Round 3 ID: 5 | Arjun Erigaisi (0.5 points)  -  Ding Liren (0.0 points)

@@ -1,0 +1,11 @@
+--- 22/06/25 12:55:14 | Standings for Round 1 / 5 ---
+ 1. Magnus Carlsen (0.0 points)
+ 2. Hikaru Nakamura (0.0 points)
+ 3. Ian Nepomniachtchi (0.0 points)
+ 4. Fabiano Caruana (0.0 points)
+ 5. Ding Liren (0.0 points)
+ 6. Gukesh D (0.0 points)
+ 7. Alireza Firouzja (0.0 points)
+ 8. Wesley So (0.0 points)
+ 9. Arjun Erigaisi (0.0 points)
+ 10. Nodirbek Abdusattorov (0.0 points)

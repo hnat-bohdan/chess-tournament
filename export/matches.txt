@@ -1,0 +1,8 @@
+22/06/25 12:55:14
+--- Past matches ---
+--- Current matches ---
+Round 1 ID: 1 | Magnus Carlsen (0.0 points) 0 - 1 Hikaru Nakamura (0.0 points)
+Round 1 ID: 2 | Ian Nepomniachtchi (0.0 points) 0.5 - 0.5 Fabiano Caruana (0.0 points)
+Round 1 ID: 3 | Ding Liren (0.0 points) 0 - 1 Gukesh D (0.0 points)
+Round 1 ID: 4 | Alireza Firouzja (0.0 points) 0 - 1 Wesley So (0.0 points)
+Round 1 ID: 5 | Arjun Erigaisi (0.0 points) 0 - 1 Nodirbek Abdusattorov (0.0 points)

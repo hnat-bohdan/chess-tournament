@@ -1,0 +1,8 @@
+--- 22/06/25 12:55:14 | Current Pairings for Round 5 / 5 ---
+Round 5 ID: 1 | Wesley So (3.5 points)  -  Gukesh D (2.5 points)
+Round 5 ID: 2 | Nodirbek Abdusattorov (3.0 points)  -  Ian Nepomniachtchi (2.5 points)
+Round 5 ID: 3 | Hikaru Nakamura (2.0 points)  -  Fabiano Caruana (1.5 points)
+Round 5 ID: 4 | Alireza Firouzja (1.5 points) bye  
+Round 5 ID: 5 | Arjun Erigaisi (1.5 points) bye  
+Round 5 ID: 6 | Magnus Carlsen (1.0 points) bye  
+Round 5 ID: 7 | Ding Liren (1.0 points) bye  
