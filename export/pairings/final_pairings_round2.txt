@@ -1,0 +1,6 @@
+--- 24/07/25 20:35:17 | Tournament Pairings for Round 2 ---
+Match ID 1 (R2): Bob (HALF BYE) - Result: half bye
+Match ID 2 (R2): Hikaru Nakamura (W) vs Magnus Carlsen (B) - Result: 0-1
+Match ID 3 (R2): Noah (W) vs Alice (B) - Result: 0.5-0.5
+Match ID 4 (R2): Charlie (W) vs Diana (B) - Result: 0.5-0.5
+----------------------------------------

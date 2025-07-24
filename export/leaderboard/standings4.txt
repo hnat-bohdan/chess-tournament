@@ -1,0 +1,11 @@
+--- 24/07/25 20:35:17 | Current Standings (Round 4 / 4) ---
+Rank  Player Name               ELO    Points  Bye   Present  Color Bal.
+--------------------------------------------------------------------------------
+1     Bob                       400    3.0     No    Yes      0         
+2     Magnus Carlsen            2850   2.5     No    Yes      -2        
+3     Alice                     400    2.5     No    Yes      0         
+4     Noah                      400    2.0     Reg   Yes      0         
+5     Hikaru Nakamura           2800   2.0     Reg   Yes      2         
+6     Diana                     400    2.0     No    Yes      2         
+7     Charlie                   400    1.5     Reg   Yes      2         
+--------------------------------------------------------------------------------
