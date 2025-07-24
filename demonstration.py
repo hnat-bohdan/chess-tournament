@@ -80,10 +80,10 @@ if __name__ == "__main__":
         
         tournament.end_round()
 
-    # --- Simulate Rounds 5-6: Danish System ---
+    # --- Simulate Rounds 5-6: Dutch System ---
     for round_num in range(5, 7): # Rounds 5, 6
         print(f"\n{Tournament().long_line()}")
-        print(f"{Tournament().now()} | SIMULATING ROUND {round_num}: dANISH SYSTEM PAIRING")
+        print(f"{Tournament().now()} | SIMULATING ROUND {round_num}: DUTCH SYSTEM PAIRING")
 
         # Example: Mark Karen as absent in Round 5
         if round_num == 5:
@@ -96,7 +96,7 @@ if __name__ == "__main__":
             if karen_player:
                 karen_player.is_present = True
 
-        tournament.pair_round("danish")
+        tournament.pair_round("dutch")
         tournament.print_pairings()
 
         print(f"\n{Tournament().now()} | Entering Random Results for Round {round_num}...")
