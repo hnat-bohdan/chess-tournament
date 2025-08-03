@@ -1,6 +1,0 @@
---- 24/07/25 20:35:17 | Tournament Pairings for Round 1 ---
-Match ID 1 (R1): Noah (BYE) - Result: bye
-Match ID 2 (R1): Bob (W) vs Hikaru Nakamura (B) - Result: 1-0
-Match ID 3 (R1): Diana (W) vs Magnus Carlsen (B) - Result: 0-1
-Match ID 4 (R1): Alice (W) vs Charlie (B) - Result: 1-0
-----------------------------------------

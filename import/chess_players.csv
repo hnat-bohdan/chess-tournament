@@ -1,4 +1,6 @@
 id,name_surname,elo,points,past_colors,past_matches,past_opponents,had_regular_bye,has_bye_this_round,is_present
 1,Magnus Carlsen,2850,0,"[]","[]","[]",False,False,True
 2,Hikaru Nakamura,2800,0,"[]","[]","[]",False,False,True
+3,Rameshbabu Praggnanandhaa,2750,0,"[]","[]","[]",False,False,True
+4,Stockfish,3750,0,"[]","[]","[]",False,False,True
 

@@ -1,21 +1,15 @@
 import os, json, csv, datetime, random, math
 import pandas as pd
+from abc import ABC, abstractmethod
+from typing import Dict, List, Optional, Tuple, Union
+from collections import *
+
 
 # --- Player Class ---
 class Player:
-    """
-    Represents a chess player in the tournament.
-    """
+    """Represents a chess player in the tournament."""
     def __init__(self, id: int, name_surname: str, elo: int):
-        """
-        Initializes a Player object.
-
-        Args:
-            id (int): Unique player ID.
-            name_surname (str): Player's full name.
-            elo (int): Player's ELO rating.
-        """
-        if not isinstance(id, int) or id < 0: # ID 0 used for BYE_OPPONENT dummy player
+        if not isinstance(id, int) or id < 0:
             raise ValueError("Player ID must be a non-negative integer.")
         if not isinstance(name_surname, str) or not name_surname.strip():
             raise ValueError("Player name cannot be empty.")
@@ -24,61 +18,104 @@ class Player:
             elo = 100
 
         self.id = id
-        self.name_surname = name_surname.strip()
-        self.elo = elo
+        self.name_surname = self._name_surname_encoder(name_surname.strip())
+        self.elo = self._elo_encoder(elo)
         self.points = 0.0
-        # Initialize mutable attributes as separate empty lists
-        self.past_colors = []       # List of colors played (e.g., 'white', 'black', 'bye', 'half bye')
-        self.past_matches = []      # List of Match IDs played (per-round IDs)
-        self.past_opponents = []    # List of Player IDs of past opponents
-        self.had_regular_bye = False # True if player has already received a regular 1-point bye
-        self.has_bye_this_round = False # True if player receives ANY type of bye in the current round
-        self.is_present = True      # True by default, can be set to False for absence
-        self.color_balance_counter = 0 # +1 for white, -1 for black. Resets on bye.
+        self.bonus_points = 0.0
+        self.past_colors: list[str] = []
+        self.past_matches: list[int] = []
+        self.past_opponents: list[int] = []
+        self.had_regular_bye = False
+        self.has_bye_this_round = False
+        self.is_present = True
+        self.color_balance_counter = 0
+        self.past_results: list[str] = []
+
+    @staticmethod
+    def _name_surname_encoder(name_surname: str) -> str:
+        """Encode name to fit within length limits (20 characters).
+        Args:
+            name_surname (str): Player name.
+        Returns:
+            str: Encoded name.
+        """
+        length_limit: int = 20
+        if name_surname is None or name_surname.strip() == "":
+            return "BYE_OPPONENT"
+        if len(name_surname) < length_limit:
+            return name_surname
+        
+        name_surname_list = name_surname.split()
+        for i in range(len(name_surname_list) - 1):
+            name_surname_list[i] = name_surname_list[i][0] + ". "
+        name_surname = "".join(name_surname_list)
+        
+        if len(name_surname) < length_limit:
+            return name_surname
+        
+        return (name_surname[:length_limit - 3] + "...")
+
+    @staticmethod
+    def _elo_encoder(elo_input: int | float | None | str) -> int:
+        """Encode ELO to valid integer format.
+        Args:
+            elo_input: Player ELO (even in sentence)
+        Returns:
+            int: Encoded ELO, 100 if couldn't encode.
+        """
+        try:
+            return int(elo_input)
+        except (ValueError, TypeError):
+            if isinstance(elo_input, str):
+                for item in elo_input.split():
+                    if item.isdigit():
+                        return int(item)
+            print(f"{TournamentUtils.now()} | Warning: Invalid ELO format '{elo_input}'. Defaulting to 100.")
+            return 100
 
     def add_points(self, n: float) -> None:
-        """Adds n points to the player's score."""
         if not isinstance(n, (int, float)):
             raise TypeError("Points to add must be a number.")
         self.points = math.fsum([self.points, n])
 
+    def add_bonus_points(self, n: float) -> None:   
+        if not isinstance(n, (int, float)):
+            raise TypeError("Points to add must be a number.")
+        self.bonus_points = math.fsum([self.points, n])
+
     def player_and_elo(self) -> str:
-        """Returns a string with player ID, name, and ELO."""
-        return f"ID: {self.id} | {self.name_surname} ({self.elo} elo)"
+        return f"ID: {self.id :<3} | {self.name_surname :<20} ({self.elo :<4} elo)"
 
     def __str__(self) -> str:
-        """Returns a user-friendly string representation of the player."""
         return f"{self.name_surname} ({self.points:.1f} points)"
 
     def __repr__(self) -> str:
-        """Returns a string for unambiguous representation (e.g., in lists)."""
         return f"<{self.name_surname} - {self.points} pts>"
     
     def to_dict(self) -> dict:
-        """
-        Converts Player object to a dictionary for CSV serialization.
-        Lists are converted to JSON strings to store correctly in CSV fields.
-        """
+        """Returns a dictionary representation of the current Player object."""
         return {
             "id": self.id,
             "name_surname": self.name_surname,
             "elo": self.elo,
             "points": self.points,
-            "past_colors": json.dumps(self.past_colors), # Store as JSON string
-            "past_matches": json.dumps(self.past_matches), # Store as JSON string
-            "past_opponents": json.dumps(self.past_opponents), # Store as JSON string
-            "had_regular_bye": str(self.had_regular_bye), # Convert boolean to string "True"/"False"
+            "past_colors": json.dumps(self.past_colors),
+            "past_matches": json.dumps(self.past_matches),
+            "past_opponents": json.dumps(self.past_opponents),
+            "had_regular_bye": str(self.had_regular_bye),
             "has_bye_this_round": str(self.has_bye_this_round),
             "is_present": str(self.is_present),
-            "color_balance_counter": self.color_balance_counter
+            "color_balance_counter": self.color_balance_counter,
+            "past_results": json.dumps(self.past_results)
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> 'Player':
-        """
+    def from_dict(cls, data: dict) -> "Player":
+        """ Create a Player object from a dictionary representation. (Usually used for loading from a JSON file)
         Args:
-            data: dict - dictionary of Player ojbject attributes (e.g., read from CSV row).
-        JSON strings are parsed back into lists, and string booleans to actual booleans.
+            data (dict): Dictionary representation of the Player object.
+        Returns:
+            Player: Player object created from the dictionary representation.
         """
         player = cls(
             id=int(data["id"]),
@@ -90,27 +127,17 @@ class Player:
         player.past_matches = json.loads(data.get("past_matches", "[]"))
         player.past_opponents = json.loads(data.get("past_opponents", "[]"))
         player.had_regular_bye = data.get("had_regular_bye", "false").lower() == "true" 
-        player.has_bye_this_round =data.get("has_bye_this_round", "false").lower() == 'true'
+        player.has_bye_this_round = data.get("has_bye_this_round", "false").lower() == 'true'
         player.is_present = data.get("is_present", "true").lower() == 'true'
         player.color_balance_counter = int(data.get("color_balance_counter", 0))
+        player.past_results = json.loads(data.get("past_results", "[]"))
         return player
 
 
 # --- Match Class ---
 class Match:
-    """
-    Represents a single chess match between two players.
-    """
-    def __init__(self, match_id: int, player_white: Player, player_black: Player | None, round_number: int):
-        """
-        Initializes a Match object.
-
-        Args:
-            match_id (int): Unique match ID within a round.
-            player_white (Player): The player with white pieces (or the player receiving a bye).
-            player_black (Player | None): The player with black pieces, or None if it's a bye.
-            round_number (int): The round number this match belongs to.
-        """
+    """Represents a single chess match between two players."""
+    def __init__(self, match_id: int, player_white: Player, player_black: Optional[Player], round_number: int):
         if not isinstance(player_white, Player):
             raise TypeError("Player white must be a Player object.")
         if player_black is not None and not isinstance(player_black, Player):
@@ -120,27 +147,24 @@ class Match:
         if not isinstance(round_number, int) or round_number <= 0:
             raise ValueError("Round number must be a positive integer.")
         
-        self.match_id = match_id # This is the per-round match ID
+        self.match_id = match_id
         self.player_white = player_white
-        self.player_black = player_black if player_black is not None else Player(0, "BYE_OPPONENT", 0) # Use dummy for bye
+        self.player_black = player_black if player_black is not None else Player(0, "BYE_OPPONENT", 0)
         self.round_number = round_number
-        self.result = " - " # Default empty result for active matches
+        self.result = " - "
         self.is_bye_match = False
         self.is_half_bye_match = False
 
         if player_black is None:
-            self.is_bye_match = True # Marks it as a bye (either regular or half)
-            self.result = "bye" # Default result for bye matches
+            self.is_bye_match = True
+            self.result = "bye"
 
     def set_result(self, result: str) -> None:
-        """
-        Sets the result of the match.
-
+        """Set the result of the match.
         Args:
-            result (str): The match result ("1-0", "0-1", "0.5-0.5", "bye", "half bye").
-        
+            result (str): Result of the match. Must be one of: "1-0", "0-1", "0.5-0.5", "bye", "half bye".
         Raises:
-            ValueError: If the result format is invalid.
+            ValueError: If the result is not valid.
         """
         valid_results = {"1-0", "0-1", "0.5-0.5", "bye", "half bye"}
         if result not in valid_results:
@@ -150,32 +174,28 @@ class Match:
             print(f"Warning: Match ID {self.match_id} (R{self.round_number}) is a bye match. Result cannot be changed to '{result}'.")
             return
 
-        # If result already set and trying to change it to something different
         if self.result != " - " and result != self.result: 
-             print(f"Warning: Result for Match ID {self.match_id} (R{self.round_number}) already entered as '{self.result}'. Cannot change to '{result}'.")
-             return
-
+             print(f"Warning: Result for Match ID {self.match_id} (R{self.round_number}) already entered as '{self.result}'. Now result is changed to '{result}'.")
         self.result = result
 
     def __str__(self) -> str:
-        """Returns a user-friendly string representation of the match."""
         if self.is_bye_match:
             bye_type = "BYE" if self.result == "bye" else "HALF BYE"
-            return f"Match ID {self.match_id} (R{self.round_number}): {self.player_white.name_surname} ({bye_type}) - Result: {self.result}"
+            return f"Match ID {self.match_id :<2} (R{self.round_number :<2}): {self.player_white.name_surname} ({bye_type}) - Result: {self.result}"
         else:
-            return (f"Match ID {self.match_id} (R{self.round_number}): {self.player_white.name_surname} (W) vs "
+            return (f"Match ID {self.match_id :<2} (R{self.round_number :<2}): {self.player_white.name_surname} (W) vs "
                     f"{self.player_black.name_surname} (B) - Result: {self.result}")
 
+    def __repr__(self):
+        return f"<R{self.round_number} ID{self.match_id} | {self.player_white.name_surname} {self.result} {self.player_black.name_surname}>"
+        
     def to_dict(self) -> dict:
-        """
-        Converts Match object to a dictionary for CSV serialization.
-        Stores player IDs instead of full player objects.
-        """
+        """Return dictionary rappresentation of the current match."""
         return {
             "match_id": self.match_id,
             "round_number": self.round_number,
             "player_white_id": self.player_white.id,
-            "player_black_id": self.player_black.id, # Even for dummy BYE_OPPONENT
+            "player_black_id": self.player_black.id,
             "result": self.result,
             "is_bye_match": str(self.is_bye_match),
             "is_half_bye_match": str(self.is_half_bye_match)
@@ -183,9 +203,14 @@ class Match:
 
     @classmethod
     def from_dict(cls, data: dict, players_by_id: dict) -> 'Match':
-        """
-        Reconstructs a Match object from a dictionary (e.g., read from CSV row).
-        Requires a dictionary of Player objects (by ID) to link players.
+        """Create a Match object from a dictionary representation.
+        Args:
+            data (dict): Dictionary containing the match data.
+            players_by_id (dict): Dictionary mapping player IDs to Player objects.
+        Returns:
+            Match: The created Match object.
+        Raises:
+            ValueError: If the player IDs in the data are not found in the players_by_id dictionary.
         """
         white_id = int(data["player_white_id"])
         black_id = int(data["player_black_id"])
@@ -199,10 +224,9 @@ class Match:
         if not player_white:
             raise ValueError(f"Could not find white player for match ID {data['match_id']}. ID: {white_id}")
         
-        # If it's a bye match and the black player is our dummy, recreate it if not found
         if is_bye and black_id == 0 and not player_black:
             player_black = Player(0, "BYE_OPPONENT", 0)
-        elif not player_black and not is_bye: # If not a bye, black player must exist
+        elif not player_black and not is_bye:
              raise ValueError(f"Could not find black player for match ID {data['match_id']}. ID: {black_id}")
 
         match = cls(int(data["match_id"]), player_white, player_black, int(data["round_number"]))
@@ -212,21 +236,175 @@ class Match:
         return match
 
 
-# --- PairingManager Class ---
+# --- Utility Functions ---
+class TournamentUtils:
+    """Utility functions for tournament management."""
+    
+    @staticmethod
+    def now() -> str:
+        return datetime.datetime.now().strftime("%d/%m/%y %H:%M:%S")
 
-### Fast Acknowledgement
-"""
-    The core pairing algorithm and concepts for this Chess Tournament were inspired by and adapted from the excellent video on Swiss Tournament Pairing Algorithms by Nice Micro in his video(https://youtu.be/ijU8kL4hgIg?si=H0vN8dk4TArI67-b) on YouTube.
-    Thank You, @nicemicro(https://github.com/nicemicro/) ❤️
-"""
-class PairingManager:
-    """
-    Manages the complex pairing algorithms, including badness matrix calculation
-    and recursive search for optimal pairings.
-    """
+    @staticmethod
+    def long_line() -> str:
+        return "--- " * 20
+
+
+# --- Player Manager ---
+class PlayerManager:
+    """Manages all player-related operations."""
+    
+    def __init__(self):
+        self.players: List[Player] = []
+        self.next_player_id = 1
+
+    def add_player(self, name_surname: str, elo: int, id: int = -1) -> None:
+        
+        """
+        Add a new player to the tournament or update an existing player's ELO.
+
+        Args:
+            name_surname (str): The name and surname of the player.
+            elo (int): The ELO rating of the player.
+            id (int, optional): The ID to assign to the player. If not provided or if the ID already exists,
+                                a new ID is generated.
+
+        If a player with the same name_surname already exists, their ELO is updated to the provided value.
+        Otherwise, a new Player object is created and added to the list of players.
+        """
+        if id == -1 or self.get_player_by_id(id):
+            id_to_use = self.next_player_id
+        else:
+            id_to_use = id
+        
+        existing_player = self.get_player_by_name(name_surname)
+        if existing_player:
+            print(f"{TournamentUtils.now()} | Player '{name_surname}' already exists. Updating ELO from {existing_player.elo} to {elo}.")
+            existing_player.elo = elo
+        else:
+            p = Player(id_to_use, name_surname, elo)
+            self.players.append(p)
+            self.update_next_player_id()
+            print(f"{TournamentUtils.now()} | Player added: {p.player_and_elo()}")
+
+    def get_player_by_name(self, name_surname: str) -> Optional[Player]:
+        """
+        Arg:
+        Returns the player with the given name_surname, or None if not found."""
+        name_surname = Player._name_surname_encoder(name_surname).lower()
+        for player in self.players:
+            if player.name_surname.lower() == name_surname and player.id != 0:
+                return player
+        return None
+    
+    def toggle_player_presence(self, player_id: int) -> str:
+        player = self.get_player_by_id(player_id)
+        player.is_present = not player.is_present
+        if player.is_present:
+            return f"{TournamentUtils.now()} | Player {player.name_surname} is present now."
+        else:
+            return f"{TournamentUtils.now()} | Player {player.name_surname} is absent now."
+
+    def get_player_by_id(self, player_id: int) -> Optional[Player]:
+        """Rerutns the player with the given ID, or None if not found."""
+        for player in self.players:
+            if player.id == player_id:
+                return player
+        return None
+
+    def get_all_players(self) -> List[Player]:
+        return self.players.copy()
+
+    def get_active_players(self) -> List[Player]:
+        return [p for p in self.players if p.id != 0 and p.is_present] # Filter by is_present
+
+    def update_next_player_id(self) -> None:
+        if self.players:
+            valid_player_ids = [p.id for p in self.players if p.id != 0]
+            if valid_player_ids:
+                self.next_player_id = max(valid_player_ids) + 1
+            else:
+                self.next_player_id = 1
+        else:
+            self.next_player_id = 1
+
+    def update_standings(self) -> None:
+        self.players.sort(key=lambda p: (p.points, -p.color_balance_counter, p.elo), reverse=True)
+
+    def get_final_standings(self, top: Optional[int] = None)-> list[Player]:
+        if top is None:
+            top = len(self.players)
+        
+        top -= 1
+
+        final_standings: list[Player] = []
+
+        scoregroups: dict[float, List[Player]] = defaultdict(list)
+        #creating scoregroups
+        for player in self.players:
+            if player.points < self.players[top].points:
+                break
+            scoregroups[player.points].append(player)
+
+        for scoregruop in scoregroups.values():
+            if len(scoregruop) == 1:
+                final_standings.append(scoregruop[0])
+                continue
+            #if there are more players in the scoregroup
+            players_and_avarage_opponent: dict[Player, float] = {
+                #Player object: the avarage opponents points
+            }
+            for player in scoregruop:
+                opponents_points: list[float] = []
+                for i, match_result in enumerate(player.past_results):
+                    match(match_result):
+                        case "B" | "HB":
+                            # skip bye matches
+                            continue
+                        case "L":
+                            # don't give points for losses
+                            opponents_points.append(0.0)
+                            # but we give some points for elo in any case (tie-breaker)
+                            opponents_points.append(self.get_player_by_id(player.past_opponents[i]).elo / 10000)
+                            continue
+                        case "W":
+                            opponent = self.get_player_by_id(player.past_opponents[i])
+                            # Prioritize Head-to-Head matches
+                            if opponent in scoregruop:
+                                opponents_points.append(opponent.points ** 2)
+                            else:
+                                opponents_points.append(opponent.points)
+
+                            opponents_points.append(opponent.elo / 10000)
+                            continue
+                        case "D":
+                            opponents_points.append(self.get_player_by_id(player.past_opponents[i]).points / 2)
+                            opponents_points.append(self.get_player_by_id(player.past_opponents[i]).elo / 10000)
+                            continue
+                        case _:
+                            pass
+                players_and_avarage_opponent[player] = (math.fsum(opponents_points) * 2) / len(opponents_points) 
+
+            #Sort the scoregroup by the sum of the opponents' points (descending), 
+            players_and_avarage_opponent: list[tuple[Player, float]] = sorted(
+                players_and_avarage_opponent.items(),
+                key=lambda x: x[1],
+                reverse=True)
+            
+            final_standings.extend([x[0] for x in players_and_avarage_opponent])
+        
+        if len(final_standings) < len(self.players):
+            final_standings.extend(self.players[len(final_standings):])
+
+        return final_standings
+
+
+# --- Pairing Engine ---
+class PairingEngine:
+    """Handles all pairing logic and algorithms."""
+    
     # --- Constants for badness calculation and limits ---
     # Penalty for a single rematch. 
-    REMATCH_PENALTY: int = 1000 
+    REMATCH_PENALTY: float = 1000.0
 
     # For quadratic penalty (e.g., if played twice, 4x penalty):
     # REMATCH_PENALTY_QUADRATIC_FACTOR = 100.0 # Use this if you want quadratic penalty
@@ -234,9 +412,6 @@ class PairingManager:
 
     ELO_DIFF_DIVISOR: float = 500.0
     # POSITION_FINE_TUNE_DIVISOR = 1000.0 # Tiny influence from index difference (if you want)
-
-    # Penalty for dutch system if players are from the same half of the sorted list
-    SAME_HALF_PENALTY: float = 3.0 # Moderate penalty to encourage top-vs-bottom pairing
 
     #MATCH_BADNESS_LIMIT is a heuristic for speed.
     #If total badness of a complete pairing falls below this, the search stops early.
@@ -246,26 +421,32 @@ class PairingManager:
     # MATCH_ACCECPTABLE_BADNESS_LIMIT is a heuristic for speed.
     # If total badness of a complete pairing falls below this, the search stops early.
     # If you want to ALWAYS find the absolute mathematically best pairing, set this to 0.0.
-    MATCH_ACCECPTABLE_BADNESS_LIMIT:float = 0.0
+    MATCH_ACCEPTABLE_BADNESS_LIMIT:float = 3.0
 
-    def __init__(self, tournament_ref):
-        self.tournament = tournament_ref # Reference to the Tournament instance
+    def __init__(self, player_manager: PlayerManager):
+        self.player_manager = player_manager
 
-    def _calculate_badness_matrix(self, players_list: list[Player], current_round_num: int, pairing_system: str) -> pd.DataFrame:
+    def _calculate_badness_matrix(self, players_list: List[Player], pairing_system: str) -> pd.DataFrame:
+        
         """
-        Calculates a badness matrix (Pandas DataFrame) for pairing.
-        Higher values mean worse pairings. Optimized for symmetry.
-        Also updates the penalties if you want
+        Creates a badness matrix for the given players, using a combination of penalties
+        for rematches, point differences, and ELO differences.
+        The matrix is symmetric, but it generates only the upper triangle.
+        
+        Args:
+            players_list: List of Player objects to calculate the matrix for.
+        
+        Return:
+            A symmetric Pandas DataFrame with the badness of each possible pair.
         """
         player_ids = [p.id for p in players_list]
+        # Initialize with inf, then fill.
         badness_matrix = pd.DataFrame(float("inf"), index=player_ids[:-1], columns=player_ids)
 
         for i, p1 in enumerate(players_list[:-1]):
             for j, p2 in enumerate(players_list):
-                if i >= j: # Only calculate for upper triangle (or diagonal for Infinity penalty)
-                    if i == j:
-                        badness_matrix.loc[p1.id, p2.id] = float("inf") # Cannot pair with self
-                    continue # Skip redundant calculations for lower triangle
+                if i >= j: # Only calculate for the upper triangle and then mirror
+                    continue # Skip redundant calculations for lower triangle and diagonal
 
                 current_pair_badness: float = 0.0
 
@@ -276,67 +457,61 @@ class PairingManager:
                     # rematch_count = p1.past_opponents.count(p2.id)
                     # current_pair_badness += self.REMATCH_PENALTY_QUADRATIC_FACTOR * (rematch_count ** 2)
 
-                # 2. Points difference (squared) (not used for now)
-                """points_diff = abs(p1.points - p2.points)
-                current_pair_badness += (points_diff ** 2)"""
+                # 2. Points difference (squared)
+                current_pair_badness += (p1.points - p2.points) ** 2
 
-                # 3. ELO difference (divided by 400)
+                # 3. ELO difference (divided by 500)
                 elo_diff = abs(p1.elo - p2.elo)
                 current_pair_badness += (elo_diff / self.ELO_DIFF_DIVISOR)
-                
-                # 4. dutch System Specific Penalty: Same Half Pairing
-                if pairing_system == "dutch":
-                    half_size = len(players_list) // 2
-                    # Check if both players are in the top half or both in the bottom half
-                    if (i < half_size and j < half_size) or (i >= half_size and j >= half_size):
-                        current_pair_badness += self.SAME_HALF_PENALTY
 
+                # Assign to both symmetrical cells
                 badness_matrix.loc[p1.id, p2.id] = current_pair_badness
+                #badness_matrix.loc[p2.id, p1.id] = current_pair_badness # Mirror the value
                 
         return badness_matrix
 
-    def _find_best_pairing_recursive(self, players_remaining: list[Player], badness_matrix: pd.DataFrame, 
-                                     current_best_total_badness: float, current_pairing_attempt: list[tuple[Player, Player]]) -> tuple[list[tuple[Player, Player]], float] | None:
+    def _find_best_pairing_recursive(self, players_remaining: List[Player], badness_matrix: pd.DataFrame, 
+                                     current_best_total_badness: float, current_pairing_attempt: List[Tuple[Player, Player]]) -> Optional[Tuple[List[Tuple[Player, Player]], float]]:
         """
-        Recursively finds the best pairing (lowest total badness) for a list of players.
+        Recursively searches for the best possible pairing of players by minimizing the total
+        "badness" of all pairs.
+        
+        This function is a recursive helper for `find_best_pairing` and should not be called directly.
+        It takes the current best total badness and the current pairing attempt as parameters to
+        prune the search space.
         
         Args:
-            players_remaining (list[Player]): List of players yet to be paired in this sub-problem.
-            badness_matrix (pd.DataFrame): Pre-calculated badness scores between all players.
-            current_best_total_badness (float): The current best total badness found so far; used to prune branches.
-            current_pairing_attempt (list): The list of pairs already made in this recursive branch (for context/debugging).
-
+            players_remaining: List of Player objects that still need to be paired.
+            badness_matrix: Pandas DataFrame with the badness of each possible pair.
+            current_best_total_badness: The best total badness found so far.
+            current_pairing_attempt: List of pairs that have been tried so far.
+        
         Returns:
-            tuple[list[tuple[Player, Player]], float] | None: A tuple containing the list of
-            (player1, player2) pairs and their total badness score, or None if no valid pairing
-            below the limit is found.
+            A tuple containing the best pairing found and its total badness, or None if no valid
+            pairing was found.
         """
-        # Base Case: If no players remaining, we found a complete pairing.
         if not players_remaining:
             return ([], 0.0)
 
-        # Base Case: If only two players remain, they must be paired.
         if len(players_remaining) == 2:
             p1 = players_remaining[0]
             p2 = players_remaining[1]
             badness = badness_matrix.loc[p1.id, p2.id]
 
-            # Prune if this pairing is already worse than current best or exceeds single match limit
             if badness >= current_best_total_badness or badness > self.MATCH_BADNESS_LIMIT:
                 return None
             
             return ([(p1, p2)], badness)
 
-        # Recursive Step: More than two players
         best_overall_pairing = None
         min_overall_badness = float("inf")
-
         first_player = players_remaining[0]
 
-        # Iterate through all other players to find a partner for the first player
         for i in range(1, len(players_remaining)):
             current_partner = players_remaining[i]
             pair_badness = badness_matrix.loc[first_player.id, current_partner.id]
+            
+            # This check is important: if a pair is impossible (inf), skip it.
             if pair_badness == float("inf"):
                 continue
             
@@ -345,14 +520,12 @@ class PairingManager:
             if pair_badness >= current_best_total_badness or pair_badness > self.MATCH_BADNESS_LIMIT:
                 continue
 
-            # Create a new list for the recursive call, excluding the current pair
             remaining_players_for_recursion = players_remaining[1:i] + players_remaining[i+1:]
             
-            # Recursive call to find the best pairing for the rest of the players
             recursive_result = self._find_best_pairing_recursive(
                 remaining_players_for_recursion, 
                 badness_matrix, 
-                current_best_total_badness - pair_badness, # Adjust limit for recursive call
+                current_best_total_badness - pair_badness,
                 current_pairing_attempt + [(first_player, current_partner)] 
             )
 
@@ -363,443 +536,172 @@ class PairingManager:
                 if total_badness_for_combo < min_overall_badness:
                     min_overall_badness = total_badness_for_combo
                     best_overall_pairing = [(first_player, current_partner)] + recursive_pairing
-                    current_best_total_badness = min_overall_badness # Update limit for further pruning
+                    current_best_total_badness = min_overall_badness
                     
-                    # Heuristic: If a "good enough" pairing is found, return early for speed
-                    if self.MATCH_ACCECPTABLE_BADNESS_LIMIT is not None and min_overall_badness < self.MATCH_ACCECPTABLE_BADNESS_LIMIT:
+                    if self.MATCH_ACCEPTABLE_BADNESS_LIMIT is not None and min_overall_badness < self.MATCH_ACCEPTABLE_BADNESS_LIMIT:
                         return (best_overall_pairing, min_overall_badness)
             
         if best_overall_pairing is None and min_overall_badness == float("inf"):
-            return None # No valid pairing found
+            return None
         
         return (best_overall_pairing, min_overall_badness)
 
-    def find_optimal_pairing(self, players_to_pair: list[Player], current_round_num: int, pairing_system: str) -> tuple[list[tuple[Player, Player]], float] | None:
-        """
-        Public method to initiate the optimal pairing search for a round.
-        
-        Args:
-            players_to_pair (list[Player]): The list of players to pair for the current round.
-            current_round_num (int): The current round number.
-            pairing_system (str): The type of pairing system ("dutch" or "monrad") to influence badness.
-
-        Returns:
-            tuple[list[tuple[Player, Player]], float] | None: The best pairing found and its total badness,
-            or None if no valid pairing can be found within limits.
-        """
+    def find_optimal_pairing(self, players_to_pair: List[Player]) -> Optional[Tuple[List[Tuple[Player, Player]], float]]:
         if not players_to_pair:
             return ([], 0.0)
         if len(players_to_pair) % 2 != 0:
             raise ValueError("Player list for optimal pairing must be even after bye assignment.")
 
-        # Recalculate badness matrix for the current set of players and round
-        self.badness_matrix = self._calculate_badness_matrix(players_to_pair, current_round_num, pairing_system)
-        
-        # Calculate dynamic ROUND_BADNESS_LIMIT
-        round_badness_limit = len(players_to_pair) * self.tournament.num_rounds * 2 
+        self.badness_matrix = self._calculate_badness_matrix(players_to_pair, "dutch")
+        round_badness_limit = len(players_to_pair) * 4 # Adjusted limit to be more generous
 
-        # Initial call to recursive function
         result = self._find_best_pairing_recursive(
             players_to_pair, 
             self.badness_matrix, 
-            round_badness_limit, # Use the dynamic limit for initial pruning
+            round_badness_limit,
             []
         )
         
         if result and result[1] <= round_badness_limit:
             return result
         else:
-            # print(f"Warning: No optimal pairing found within ROUND_BADNESS_LIMIT ({round_badness_limit:.2f}).")
+            print(f"{TournamentUtils.now()} | Warning: No optimal pairing found within ROUND_BADNESS_LIMIT ({round_badness_limit:.2f}).")
             return None
 
+    def assign_colors_to_pair(self, p1: Player, p2: Player) -> Tuple[Player, Player]:
+        """Assign colors based on color balance preference, points, and rating."""
+        # Rule 1: Color Preference (color_balance_counter)
+        # Prefer the player who has played more with black (lower counter) to get white
+        if p1.color_balance_counter < p2.color_balance_counter:
+            return p1, p2  # p1 gets white
+        if p2.color_balance_counter < p1.color_balance_counter:
+            return p2, p1  # p2 gets white
 
-# --- Tournament Class ---
-class Tournament:
-    """
-    Manages a chess tournament, including players, pairings, and results.
-    Persists data using CSV files.
-    """
-    def __init__(self, num_rounds: int = 5):
-        """
-        Initializes a Tournament.
-
-        Args:
-            num_rounds (int): The total number of rounds in the tournament.
-        """
-        if not isinstance(num_rounds, int) or num_rounds <= 0:
-            raise ValueError("Number of rounds must be a positive integer.")
-        
-        self.current_round = 0 # Starts at 0, first pairing will be round 1
-        self.num_rounds = num_rounds
-        self.players: list[Player] = [] # List of Player objects
-        self.next_player_id = 1 # Tracks the next available player ID
-        
-        self.current_matches: list[Match] = [] # Matches for the current round
-        self.rounds_matches: dict[int, list[Match]] = {} # All matches, organized by round number
-        
-        self.NEXT_MATCH_ID_IN_ROUND = 1 # Resets each round for match.id
-        
-        self.pairing_manager = PairingManager(self) # Initialize PairingManager with reference to self
-
-    def now(self) -> str:
-        """Returns current datetime formatted as string."""
-        return datetime.datetime.now().strftime("%d/%m/%y %H:%M:%S")
-
-    def long_line(self) -> str:
-        """Returns a decorative line for printing."""
-        return "--- " * 20
-
-    def update_next_player_id(self) -> None:
-        """Updates next_player_id based on the highest existing player ID."""
-        if self.players:
-            # Exclude the dummy BYE_OPPONENT (ID 0) from max calculation
-            valid_player_ids = [p.id for p in self.players if p.id != 0]
-            if valid_player_ids:
-                self.next_player_id = max(valid_player_ids) + 1
-            else: # Only dummy player or no players
-                self.next_player_id = 1
-        else:
-            self.next_player_id = 1
-        print(f"{self.now()} | Player ID tracker updated. Next ID: {self.next_player_id}")
-
-    def name_surname_encoder(self, name_surname: str) -> str:
-        """Encodes name and surname to a maximum of 20 characters."""
-        lenght_limit: int = 20
-        if name_surname is None or name_surname.strip() == "":
-            return "BYE_OPPONENT"
-        if len(name_surname) < lenght_limit:
-            return name_surname
-        
-        name_surname_list = name_surname.split()
-        surname = name_surname_list.pop()
-        for name in name_surname_list:
-            name = name[0] + ". "
-        name_surname = "".join(name_surname_list) + surname
-        
-        if len(name_surname) < lenght_limit:
-            return name_surname
-        
-        return (name_surname[:lenght_limit - 3] + "...")
-
-    def elo_encoder(self, elo_input) -> int:
-        """
-        Encodes ELO input to an integer. Handles string input with digits.
-        """
-        try:
-            return int(elo_input)
-        except (ValueError, TypeError):
-            if isinstance(elo_input, str):
-                for item in elo_input.split():
-                    if item.isdigit():
-                        return int(item)
-            print(f"{self.now()} | Warning: Invalid ELO format '{elo_input}'. Defaulting to 100.")
-            return 100
-
-    def get_player_by_name(self, name_surname: str) -> Player | None:
-        """Returns a player object by name, case-insensitive."""
-        for player in self.players:
-            if player.name_surname.lower() == name_surname.lower() and player.id != 0: # Exclude dummy BYE_OPPONENT
-                return player
-        return None
-    
-    def get_player_by_id(self, player_id: int) -> Player | None:
-        """Returns a player object by ID."""
-        for player in self.players:
-            if player.id == player_id:
-                return player
-        return None
-
-    def add_player(self, name_surname: str, elo: int, id: int = -1) -> None:
-        """
-        Adds a new player to the tournament or updates an existing one if name matches.
-        """
-        if id == -1: # Use internal ID if not provided
-            id_to_use = self.next_player_id
-        else:
-            id_to_use = id
-
-        name_surname = self.name_surname_encoder(name_surname)
-        existing_player = self.get_player_by_name(name_surname)
-        if existing_player:
-            print(f"{self.now()} | Player '{name_surname}' already exists. Updating ELO from {existing_player.elo} to {elo}.")
-            existing_player.elo = self.elo_encoder(elo)
-        else:
-            p = Player(id_to_use, name_surname, self.elo_encoder(elo))
-            self.players.append(p)
-            self.update_next_player_id() # Update ID tracker after adding
-            print(f"{self.now()} | Player added: {p.player_and_elo()}")
-
-    def save_players_to_csv(self, filepath: str = "players.csv") -> None:
-        """
-        Saves all players to a CSV file. Overwrites existing file.
-        """
-        os.makedirs(os.path.dirname(filepath) or '.', exist_ok=True) 
-
-        with open(filepath, "w", newline='') as file:
-            fieldnames = ["id", "name_surname", "elo", "points", "past_colors", 
-                          "past_matches", "past_opponents", "had_regular_bye", "has_bye_this_round", "is_present", "color_balance_counter"]
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
-            
-            writer.writeheader()
-            for player in self.players:
-                if player.id == 0 and player.name_surname == "BYE_OPPONENT": # Do not save dummy BYE_OPPONENT
-                    continue
-                writer.writerow(player.to_dict())
-            print(f"{self.now()} | Players saved to {filepath}!")
-
-    def load_players_from_csv(self, filepath: str = "registered_players.csv", clear_players: bool = True) -> None:
-        """
-        Loads players from a CSV file.
-        Args:
-            filepath (str): The path to the CSV file.
-            clear_players (bool): If True, clears existing players before loading.
-        """
-        if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
-            print(f"{self.now()} | No player data file '{filepath}' found or file is empty. Starting with no players.")
-            self.players = []
-            return
-        
-        if clear_players:
-            self.players = [] # Clear current players before loading
-
-        with open(filepath, "r", newline='') as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                try:
-                    self.players.append(Player.from_dict(row))
-                except (ValueError, KeyError, json.JSONDecodeError, TypeError) as e:
-                    print(f"{self.now()} | Error loading player from row {row}: {e}. Skipping row.")
-        
-        self.update_next_player_id()
-        print(f"{self.now()} | Players loaded from {filepath}!")
-
-    def update_standings(self) -> None:
-        """Sorts players by points and color balance in descending order, then ELO for tie-breaking."""
-        self.players.sort(key=lambda p: (p.points, -p.color_balance_counter, p.elo), reverse=True)
-        # print(f"{self.now()} | Standings sorted by points and ELO!") # Removed this print for less verbosity
-
-    def _assign_colors_to_pair(self, p1: Player, p2: Player) -> tuple[Player, Player]:
-        """
-        Assigns White and Black colors to a pair based on preference, past colors, points, and ELO.
-        Returns (white_player, black_player).
-        """
-        # Rule 1: Strong Color Preference
-        if p2.color_balance_counter <= -2 or p1.color_balance_counter >= 2: # p2 wants white or p1 prefer black
-            return p2, p1
-        if p1.color_balance_counter <= -2 or p2.color_balance_counter >= 2: # vice versa
-            return p1, p2
-
-        # Rule 2: Player who played more Black games gets White
-        black_games_p1 = p1.past_colors.count("black")
-        black_games_p2 = p2.past_colors.count("black")
-        if black_games_p1 > black_games_p2:
-            return p1, p2
-        if black_games_p2 > black_games_p1:
-            return p2, p1
-
-        # Rule 3: Player with fewer points gets White
+        # Rule 2: Player with fewer points gets White
         if p1.points < p2.points:
             return p1, p2
         if p2.points < p1.points:
             return p2, p1
 
-        # Rule 4: Player with lower ELO gets White (final tie-breaker)
-        if p1.elo <= p2.elo:
+        # Rule 3: Player with lower ELO gets White (final tie-breaker)
+        if p1.elo <= p2.elo: # If ELO is equal, p1 gets white (stable tie-break)
             return p1, p2
         else:
             return p2, p1
 
-    def _add_match_to_tournament(self, player_white: Player, player_black: Player | None = None, is_half_bye: bool = False) -> Match:
-        """Helper to create and add a match, updating player history."""
-        match = Match(self.NEXT_MATCH_ID_IN_ROUND, player_white, player_black, self.current_round)
-        self.NEXT_MATCH_ID_IN_ROUND += 1
+
+# --- Match Manager ---
+class MatchManager:
+    """Manages matches and round scheduling."""
+    
+    def __init__(self, player_manager: PlayerManager, pairing_engine: 'PairingEngine'): # Forward reference for PairingEngine
+        self.player_manager = player_manager
+        self.pairing_engine = pairing_engine
+        self.rounds_matches: Dict[int, List[Match]] = {}
+        self.next_match_id_in_round = 1
+
+    def get_match_by_round_and_id(self, round_number: int, match_id: int) -> Optional[Match]:
+        for match in self.rounds_matches.get(round_number, []):
+            if match.round_number == round_number and match.match_id == match_id:
+                return match
+        return None
+    
+    def create_match(self, player_white: Player, player_black: Optional[Player], round_number: int, is_half_bye: bool = False) -> Match:
+        match = Match(self.next_match_id_in_round, player_white, player_black, round_number)
+        self.next_match_id_in_round += 1
         
-        if match.is_bye_match: # It's a bye, either regular or half
-            match.is_half_bye_match = is_half_bye # Mark if it's explicitly a half bye
-            player_white.past_colors.append("half bye" if  is_half_bye else "bye")
+        if match.is_bye_match:
             match.is_half_bye_match = is_half_bye
+            player_white.past_colors.append("half bye" if is_half_bye else "bye")
             if is_half_bye:
                 match.result = "half bye"
-                player_white.has_bye_this_round = True
+                player_white.has_bye_this_round = True # Mark for current round
             else:
-                player_white.had_regular_bye = True
-            player_white.past_matches.append(match.match_id) # Use per-round ID
-            player_white.past_opponents.append(0) # 0 for BYE_OPPONENT ID
+                player_white.had_regular_bye = True # Mark as had regular bye
+                player_white.has_bye_this_round = True # Mark for current round
+            player_white.past_matches.append(match.match_id)
+            player_white.past_opponents.append(0)
         else:
             player_white.past_opponents.append(player_black.id)
             player_black.past_opponents.append(player_white.id)
             player_white.past_colors.append("white")
             player_black.past_colors.append("black")
-            player_white.past_matches.append(match.match_id) # Use per-round ID
+            player_white.past_matches.append(match.match_id)
             player_black.past_matches.append(match.match_id)
 
-        self.current_matches.append(match)
-        self.rounds_matches.setdefault(self.current_round, []).append(match) # Store in rounds_matches
-        print(f"{self.now()} | Added match: {match}")
+        self.rounds_matches.setdefault(round_number, []).append(match)
+        print(f"{TournamentUtils.now()} | Added match: {match}")
         return match
 
-    def _get_eligible_bye_player(self, players_pool: list[Player]) -> Player | None:
-        """
-        Finds the lowest-point player eligible for a REGULAR bye (hasn't had one before).
-        If tied, selects randomly.
-        """
+    def get_eligible_bye_player(self, players_pool: List[Player]) -> Optional[Player]:
         eligible_for_regular_bye = [p for p in players_pool if not p.had_regular_bye]
         if not eligible_for_regular_bye:
-            return None # No one eligible for a regular bye
+            return None
 
-        # Sort eligible players by points ascending, then ELO ascending (to make random choice more stable)
         eligible_for_regular_bye.sort(key=lambda p: (p.points, p.elo))
-        
         lowest_point = eligible_for_regular_bye[0].points
         tied_players = [p for p in eligible_for_regular_bye if p.points == lowest_point]
         
-        return random.choice(tied_players) # Randomly select from those tied on lowest points
+        return random.choice(tied_players)
 
-    def _handle_bye_assignment(self, players_pool: list[Player]) -> tuple[Player | None, list[Player]]:
-        """
-        Manages bye assignment (regular or half-bye).
-        Returns the bye player (if any) and the updated list of players for pairing.
-        """
+    def handle_bye_assignment(self, players_pool: List[Player], round_number: int) -> Tuple[Optional[Player], List[Player]]:
         bye_player = None
-        players_for_pairing = list(players_pool) # Create a copy of active players
+        players_for_pairing = list(players_pool)
 
-        # Handle players marked as absent (is_present = False) - they get a half-bye first
+        # Handle absent players first (they always get a half-bye)
         absent_players = [p for p in players_for_pairing if not p.is_present]
         for p in absent_players:
             if p.id != 0 and not p.has_bye_this_round: # Ensure not already assigned a bye
                 p.add_points(0.5)
                 p.has_bye_this_round = True
-                self._add_match_to_tournament(p, None, is_half_bye=True)
-                print(f"{self.now()} | Player {p.name_surname} is absent and receives a HALF BYE (0.5 pt) in Round {self.current_round}.")
+                self.create_match(p, None, round_number, is_half_bye=True)
+                print(f"{TournamentUtils.now()} | Player {p.name_surname} is absent and receives a HALF BYE (0.5 pt) in Round {round_number}.")
         
         # Remove absent players from the pool for pairing
         players_for_pairing = [p for p in players_for_pairing if p.is_present]
 
         if len(players_for_pairing) % 2 != 0: # Odd number of players remaining, so a bye is needed
-            
-            # --- Attempt Regular Bye ---
-            potential_regular_bye_player = self._get_eligible_bye_player(players_for_pairing)
+            potential_regular_bye_player = self.get_eligible_bye_player(players_for_pairing)
 
             if potential_regular_bye_player:
-                # If an eligible player for a regular bye is found, assign it
                 bye_player = potential_regular_bye_player
-                bye_player.add_points(1.0) # 1 point for regular bye
-                bye_player.had_regular_bye = True
-                self._add_match_to_tournament(bye_player, None, )
+                bye_player.add_points(1.0)
+                # had_regular_bye and has_bye_this_round are set in create_match
+                self.create_match(bye_player, None, round_number) # This creates a regular bye match
                 players_for_pairing.remove(bye_player)
-                #print(f"{self.now()} | Player {bye_player.name_surname} receives a REGULAR BYE (1.0 pt) in Round {self.current_round}.")
+                print(f"{TournamentUtils.now()} | Player {bye_player.name_surname} receives a REGULAR BYE (1.0 pt) in Round {round_number}.")
             else:
-                # --- Fallback to Half Bye if no one eligible for Regular Bye ---
-                # Find the lowest-rated player among remaining players
+                # Fallback to Half Bye if no one eligible for Regular Bye
                 players_for_pairing.sort(key=lambda p: (p.points, p.elo))
                 half_bye_player = players_for_pairing.pop(0) # Take the lowest-rated player
                 
-                half_bye_player.add_points(0.5) # 0.5 points for half bye
-                half_bye_player.has_bye_this_round = True
+                half_bye_player.add_points(0.5)
+                # has_bye_this_round is set in create_match
                 bye_player = half_bye_player # This is our bye player for this round
-                self._add_match_to_tournament(bye_player) 
-                print(f"{self.now()} | Player {half_bye_player.name_surname} receives a HALF BYE (0.5 pt) in Round {self.current_round} (no eligible regular bye player).")
+                self.create_match(bye_player, None, round_number, is_half_bye=True)
+                print(f"{TournamentUtils.now()} | Player {half_bye_player.name_surname} receives a HALF BYE (0.5 pt) in Round {round_number} (no eligible regular bye player).")
         
         return bye_player, players_for_pairing
 
-    def pair_round(self, pairing_system: str) -> list[Match]:
-        """
-        Generates pairings for the current round based on the specified system.
-        
-        Args:
-            pairing_system (str): "random", "by rank",  "dutch", or "monrad".
-            
-        Returns:
-            list[Match]: A list of Match objects for the current round.
-        
-        Raises:
-            ValueError: If an invalid pairing system is specified.
-            RuntimeError: If pairing fails and manual intervention is needed.
-        """
-        if self.current_round >= self.num_rounds:
-            print(f"{self.now()} | Tournament has reached its maximum rounds ({self.num_rounds}). Cannot pair new round.")
-            return []
+    def get_matches_for_round(self, round_number: int) -> List[Match]:
+        return self.rounds_matches.get(round_number, [])
 
-        self.current_round += 1
-        self.current_matches = [] # Reset matches for the new round
-        self.NEXT_MATCH_ID_IN_ROUND = 1 # Reset match ID for the new round
-        self.rounds_matches[self.current_round] = [] # Initialize list for this round
+    def reset_match_id_counter(self) -> None:
+        self.next_match_id_in_round = 1
 
-        print(f"\n{self.long_line()}")
-        print(f"{self.now()} | Pairing Round {self.current_round} / {self.num_rounds} using {pairing_system.upper()} system.")
 
-        # Reset has_bye_this_round for all players at the start of a new round
-        for p in self.players:
-            p.has_bye_this_round = False # Only relevant for the current round
+# --- Result Tracker ---
+class ResultTracker:
+    """Manages match results and scoring."""
+    
+    def __init__(self, match_manager: MatchManager, player_manager: PlayerManager):
+        self.match_manager = match_manager
+        self.player_manager = player_manager
 
-        # Get players who are present for this round
-        active_players = [p for p in self.players if p.id != 0] # Exclude dummy bye opponent
-        if len(active_players) < 2:
-            print(f"{self.now()} | Not enough active players ({len(active_players)}) to pair a round.")
-            return []
-
-        # Handle bye assignment for the round
-        bye_player, players_for_pairing = self._handle_bye_assignment(active_players)
-        
-        if len(players_for_pairing) % 2 != 0: # Should be even after bye handling
-            raise RuntimeError(f"Internal error: Odd number of players ({len(players_for_pairing)}) remaining after bye assignment for pairing.")
-        
-        if not players_for_pairing: # No players left after bye, e.g., 1 player tournament
-            print(f"{self.now()} | No players left to pair after bye assignment.")
-            return self.current_matches
-
-        # --- Perform Pairing based on System ---
-        paired_player_tuples: list[tuple[Player, Player]] = []
-        
-        if pairing_system == "random":
-            random.shuffle(players_for_pairing)
-            for i in range(0, len(players_for_pairing), 2):
-                paired_player_tuples.append((players_for_pairing[i], players_for_pairing[i+1]))
-
-        elif pairing_system == "by rank":
-            players_for_pairing.sort(key=lambda p: (p.points, p.elo), reverse=True)
-            for i in range(0, len(players_for_pairing), 2):
-                paired_player_tuples.append((players_for_pairing[i], players_for_pairing[i+1]))
-            
-        elif pairing_system in ["dutch", "monrad"]:
-            # Sort players according to the system's rules before passing to optimal pairing
-            players_for_pairing.sort(key=lambda p: (p.points, p.elo), reverse=True)
-
-            optimal_pairing_result = self.pairing_manager.find_optimal_pairing(
-                players_for_pairing, self.current_round, pairing_system
-            )
-            
-            if optimal_pairing_result:
-                paired_player_tuples = optimal_pairing_result[0]
-            else:
-                print(f"{self.now()} | Failed to find optimal {pairing_system.upper()} pairing. Assigning half-byes to remaining players.")
-                for p in players_for_pairing: # Give half-bye to all remaining
-                    if not p.has_bye_this_round: # Only if not already handled as absent or regular bye
-                        p.add_points(0.5)
-                        p.has_bye_this_round = True
-                        self._add_match_to_tournament(p, None, is_half_bye=True)
-                return self.current_matches # Return matches with half-byes
-        else:
-            raise ValueError(f"Unknown pairing system: {pairing_system}")
-
-        # --- Create Match Objects and Assign Colors ---
-        for p1, p2 in paired_player_tuples:
-            white_player, black_player = self._assign_colors_to_pair(p1, p2)
-            self._add_match_to_tournament(white_player, black_player)
-        
-        print(f"{self.now()} | Round {self.current_round} pairings complete.")
-        return self.current_matches
-
-    def enter_result(self, match_id: int, result: str, round_num: int | None = None) -> None:
-        """
-        Enters the result for a given match ID and round number, then updates player scores.
-        """
-        if round_num is None:
-            round_num = self.current_round
-        
-        matches_in_round = self.rounds_matches.get(round_num)
+    def enter_result(self, match_id: int, result: str, round_num: int) -> None:
+        matches_in_round = self.match_manager.get_matches_for_round(round_num)
         if not matches_in_round:
-            print(f"{self.now()} | Error: No matches found for Round {round_num}.")
+            print(f"{TournamentUtils.now()} | Error: No matches found for Round {round_num}.")
             return
 
         match_found = None
@@ -809,161 +711,260 @@ class Tournament:
                 break
         
         if not match_found:
-            print(f"{self.now()} | Error: Match ID {match_id} not found in Round {round_num}.")
+            print(f"{TournamentUtils.now()} | Error: Match ID {match_id} not found in Round {round_num}.")
             return
 
-        if match_found.is_bye_match: # Cannot enter result for bye match, points already awarded
-            print(f"{self.now()} | Match ID {match_id} (R{round_num}) is a bye match. Points for {match_found.player_white.name_surname} already awarded.")
-            return
-
-        # Check if result was already entered (if it's not the default " - ")
-        if match_found.result != " - ":
-            print(f"{self.now()} | Warning: Result for Match ID {match_id} (R{round_num}) already entered as '{match_found.result}'. Skipping.")
+        if match_found.is_bye_match:
+            print(f"{TournamentUtils.now()} | Match ID {match_id} (R{round_num}) is a bye match. Points for {match_found.player_white.name_surname} already awarded.")
             return
             
         try:
-            match_found.set_result(result) # Use the setter with validation
+            match_found.set_result(result)
         except ValueError as e:
-            print(f"{self.now()} | Error setting result for Match ID {match_id} (R{round_num}): {e}")
+            print(f"{TournamentUtils.now()} | Error setting result for Match ID {match_id} (R{round_num}): {e}")
+            return
+    
+        print(f"{TournamentUtils.now()} | Match ID {match_id} (R{round_num}) result set to {result}.")
+
+    def update_players_results(self, matches: List[Match]) -> None:
+        for m in matches:
+            match(m.result.lower()):
+                case "1-0":
+                    m.player_white.add_points(1.0)
+                    m.player_white.past_results.append("W")
+                    m.player_black.past_results.append("L")
+                    m.player_black.color_balance_counter -= 1
+                    m.player_white.color_balance_counter += 1
+                case "0-1":
+                    m.player_black.add_points(1.0)
+                    m.player_white.past_results.append("L")
+                    m.player_black.past_results.append("W")
+                    m.player_black.color_balance_counter -= 1
+                    m.player_white.color_balance_counter += 1
+                case "0.5-0.5":
+                    m.player_black.add_points(0.5)
+                    m.player_white.add_points(0.5)
+                    m.player_white.past_results.append("D")
+                    m.player_black.past_results.append("D")
+                    m.player_black.color_balance_counter -= 1
+                    m.player_white.color_balance_counter += 1
+                case "bye":
+                    #points are already added in handle_bye_assignment
+                    m.player_white.past_results.append("B")
+                case "half bye":
+                    m.player_white.past_results.append("HB")
+                case _:
+                    try:
+                        m.player_white.past_results.append(m.result)
+                        m.player_black.past_results.append(m.result)
+                    except:
+                        print(f"{TournamentUtils.now()} | Error: Unrecognized result '{m.result}'. No points awarded.")
+            
+
+# --- File Manager ---
+class FileManager:
+    """Handles all file I/O operations."""
+    
+    def __init__(self, player_manager: PlayerManager, match_manager: MatchManager):
+        self.player_manager = player_manager
+        self.match_manager = match_manager
+
+    def save_players_to_csv(self, filepath: str = "players.csv") -> None:
+        os.makedirs(os.path.dirname(filepath) or '.', exist_ok=True)
+
+        with open(filepath, "w", newline='') as file:
+            fieldnames = ["id", "name_surname", "elo", "points", "past_colors", 
+                          "past_matches", "past_opponents", "had_regular_bye", "has_bye_this_round", "is_present", "color_balance_counter", "past_results"]
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            
+            writer.writeheader()
+            for player in self.player_manager.get_all_players():
+                if player.id == 0 and player.name_surname == "BYE_OPPONENT":
+                    continue
+                writer.writerow(player.to_dict())
+            print(f"{TournamentUtils.now()} | Players saved to {filepath}!")
+
+    def load_players_from_csv(self, filepath: str = "registered_players.csv", clear_players: bool = True) -> None:
+        if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
+            print(f"{TournamentUtils.now()} | No player data file '{filepath}' found or file is empty. Starting with no players.")
+            if clear_players:
+                self.player_manager.players = []
+            return
+        
+        if clear_players:
+            self.player_manager.players = []
+
+        with open(filepath, "r", newline='') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                try:
+                    self.player_manager.players.append(Player.from_dict(row))
+                except (ValueError, KeyError, json.JSONDecodeError, TypeError) as e:
+                    print(f"{TournamentUtils.now()} | Error loading player from row {row}: {e}. Skipping row.")
+        
+        self.player_manager.update_next_player_id()
+        print(f"{TournamentUtils.now()} | Players loaded from {filepath}!")
+
+    def save_matches_to_csv(self, filepath: str = "matches.csv") -> None:
+        os.makedirs(os.path.dirname(filepath) or '.', exist_ok=True)
+        with open(filepath, 'w', newline='') as f:
+            fieldnames = ["match_id", "round_number", "player_white_id", "player_black_id", "result", "is_bye_match", "is_half_bye_match"]
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for round_num in sorted(self.match_manager.rounds_matches.keys()):
+                for match in self.match_manager.rounds_matches[round_num]:
+                    writer.writerow(match.to_dict())
+        print(f"{TournamentUtils.now()} | Matches saved to {filepath}!")
+
+    def load_matches_from_csv(self, filepath: str = "matches.csv") -> None:
+        if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
+            print(f"{TournamentUtils.now()} | No match data file '{filepath}' found. No matches loaded.")
+            self.match_manager.rounds_matches = {}
             return
 
-        # Update player points based on result
-        if result == "1-0": # White wins
-            match_found.player_white.add_points(1.0)
-            match_found.player_black.add_points(0.0)
-            print(f"{self.now()} | Result entered: {match_found.player_white.name_surname} wins against {match_found.player_black.name_surname}")
-        elif result == "0-1": # Black wins
-            match_found.player_white.add_points(0.0)
-            match_found.player_black.add_points(1.0)
-            print(f"{self.now()} | Result entered: {match_found.player_black.name_surname} wins against {match_found.player_white.name_surname}")
-        elif result == "0.5-0.5": # Draw
-            match_found.player_white.add_points(0.5)
-            match_found.player_black.add_points(0.5)
-            print(f"{self.now()} | Result entered: Draw between {match_found.player_white.name_surname} and {match_found.player_black.name_surname}")
-        else:
-            print(f"{self.now()} | Error: Unrecognized result '{result}'. No points awarded.")
-
-        # After results, standings might need to be re-sorted for the next round
-        self.update_standings()
-
-    def end_round(self) -> None:
-        """
-        Finalizes the current round, updates player points based on results,
-        and prepares for the next round.
-        """
-        print(f"\n{self.long_line()}")
-        print(f"{self.now()} | Ending Round {self.current_round} / {self.num_rounds}")
-
-        # Update color balance counters and reset has_bye_this_round
-        for p in self.players:
-            if p.id == 0: # Skip dummy bye opponent
-                continue
-            
-            else:
-                # Update color balance for players who played a match
-                # Find the match they played in this round
-                player_match = None
-                for match in self.rounds_matches.get(self.current_round, []):
-                    if match.player_white.id == p.id:
-                        player_match = match
-                        p.color_balance_counter += 1
-                        break
-                    elif match.player_black.id == p.id:
-                        player_match = match
-                        p.color_balance_counter -= 1
-                        break
+        players_by_id = {p.id: p for p in self.player_manager.get_all_players()}
+        self.match_manager.rounds_matches = {}
         
-        # Clear current matches for the next round
-        self.current_matches = []
-        # self.NEXT_MATCH_ID_IN_ROUND will be reset at the start of pair_round
+        with open(filepath, 'r', newline='') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                try:
+                    match = Match.from_dict(row, players_by_id)
+                    self.match_manager.rounds_matches.setdefault(match.round_number, []).append(match)
+                except (KeyError, ValueError, TypeError) as e:
+                    print(f"{TournamentUtils.now()} | Error loading match from row {row}: {e}. Skipping match.")
+        print(f"{TournamentUtils.now()} | Matches loaded from {filepath}!")
 
-        print(f"{self.now()} | Round {self.current_round} / {self.num_rounds} ended.")
-        self.print_standings()
-        print(self.long_line())
+    def save_tournament_meta(self, current_round: int, num_rounds: int, next_player_id: int, 
+                           next_match_id: int, filepath: str = "tournament_meta.csv") -> None:
+        os.makedirs(os.path.dirname(filepath) or '.', exist_ok=True)
+        with open(filepath, 'w', newline='') as f:
+            fieldnames = ["current_round", "num_rounds", "next_player_id", "next_match_id_in_round_counter"]
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerow({
+                "current_round": current_round,
+                "num_rounds": num_rounds,
+                "next_player_id": next_player_id,
+                "next_match_id_in_round_counter": next_match_id
+            })
+        print(f"{TournamentUtils.now()} | Tournament metadata saved to {filepath}!")
 
-    def print_standings(self, top: int | None = None) -> None:
-        """Prints the current tournament standings.
-        Args:
-            top (int | None, optional): Maximum number of players to display.
-            If None -> display all players.
-        """
-        self.update_standings() # Ensure sorted before printing
-        print(f"\n--- {self.now()} | Current Standings (Round {self.current_round} / {self.num_rounds}) ---")
-        print(f"{'Rank':<5} {'Player Name':<25} {'ELO':<6} {'Points':<7} {'Bye':<5} {'Present':<8} {'Color Bal.':<10}")
+    def load_tournament_meta(self, filepath: str = "tournament_meta.csv") -> Optional[Dict]:
+        if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
+            print(f"{TournamentUtils.now()} | No metadata file '{filepath}' found.")
+            return None
+
+        with open(filepath, 'r', newline='') as f:
+            reader = csv.DictReader(f)
+            try:
+                meta_data = next(reader)
+                return {
+                    "current_round": int(meta_data.get("current_round", 0)),
+                    "num_rounds": int(meta_data.get("num_rounds", 5)),
+                    "next_player_id": int(meta_data.get("next_player_id", 1)),
+                    "next_match_id_in_round_counter": int(meta_data.get("next_match_id_in_round_counter", 1))
+                }
+            except (StopIteration, KeyError, ValueError) as e:
+                print(f"{TournamentUtils.now()} | Error loading metadata from {filepath}: {e}.")
+                return None
+
+
+# --- Display Manager ---
+class DisplayManager:
+    """Handles all display and export operations."""
+    
+    def __init__(self, player_manager: PlayerManager, match_manager: MatchManager):
+        self.player_manager = player_manager
+        self.match_manager = match_manager
+
+    def print_players_with_elo(self, bottom: Optional[int] = 1,  top: Optional[int] | None = None) -> None:
+        self.player_manager.update_standings()
+        print(f"\n--- {TournamentUtils.now()} | All PLayers info ---")
+        # Filter out BYE_OPPONENT and then apply 'top' limit
+        display_players = [p for p in self.player_manager.players if not (p.id == 0 and p.name_surname == "BYE_OPPONENT")]
+
+        if top is None:
+            top = len(display_players)
+
+        for player in display_players:
+            if player.id < bottom:
+                continue
+            if player.id > top:
+                break            
+            print(player.player_and_elo())
+        print("-" * 80)
+
+    def print_standings(self, current_round: int, num_rounds: int, top: Optional[int] = None) -> None:
+        self.player_manager.update_standings()
+        print(f"\n--- {TournamentUtils.now()} | Current Standings (Round {current_round} / {num_rounds}) ---")
+        print(f"{'Rank':<5} {'Player Name':<20} {'ELO':<6} {'Points':<7} {'Bye':<5} {'Present':<7} {'Color Bal.':<10}")
         print("-" * 80)
         rank = 1
+        # Filter out BYE_OPPONENT and then apply 'top' limit
+        display_players = [p for p in self.player_manager.players if not (p.id == 0 and p.name_surname == "BYE_OPPONENT")]
+        
         if top is None:
-            top = len(self.players)
-        for player in self.players:
+            top = len(display_players)
+
+        for player in display_players:
             if rank > top:
                 break
-            # Do not display the dummy BYE_OPPONENT in standings
-            if player.id == 0 and player.name_surname == "BYE_OPPONENT":
-                continue 
             bye_status = "No"
             if player.had_regular_bye:
-                bye_status = "Yes"
-            if player.has_bye_this_round:
-                bye_status = "Half" 
+                bye_status = "Reg"
+            if player.has_bye_this_round: # This indicates a bye for the current round (could be half or regular)
+                bye_status = "Half" if not player.had_regular_bye else "Reg" # Refine if it's a half or regular bye for display
+            
             present_status = "Yes" if player.is_present else "No"
-            print(f"{rank:<5} {player.name_surname:<25} {player.elo:<6} {player.points:<7.1f} {bye_status:<5} {present_status:<8} {player.color_balance_counter:<10}")
+            print(f"{rank:<5} {player.name_surname:<20} {player.elo:<6} {player.points:<7.1f} {bye_status:<5} {present_status:<7} {player.color_balance_counter:<10}")
             rank += 1
         print("-" * 80)
 
-    def print_pairings(self, round_number: int | None = None) -> None:
-        """
-        Prints pairings for a specific round or the current round.
-        """
-        if round_number is None:
-            round_number = self.current_round
-        
-        matches_to_print = self.rounds_matches.get(round_number)
+    def print_pairings(self, round_number: int) -> None:
+        matches_to_print = self.match_manager.get_matches_for_round(round_number)
         if not matches_to_print:
-            print(f"{self.now()} | No pairings found for Round {round_number}.")
+            print(f"{TournamentUtils.now()} | No pairings found for Round {round_number}.")
             return
         
-        print(f"\n--- {self.now()} | Pairings for Round {round_number} ---")
+        print(f"\n--- {TournamentUtils.now()} | Pairings for Round {round_number} ---")
         for match in matches_to_print:
-            print(match) # Use the __str__ of Match
+            print(match)
         print("-" * 30)
 
-    def export_standings_to_txt(self, filepath: str = "standings.txt") -> None:
-        """
-        Exports current tournament standings to a plain text file.
-
-        Args:
-            filepath (str): The path to the file where standings will be saved.
-        """
+    def export_standings_to_txt(self, current_round: int, num_rounds: int, filepath: str = "standings.txt") -> None:
         os.makedirs(os.path.dirname(filepath) or '.', exist_ok=True)
-        self.update_standings() # Ensure standings are current
+        self.player_manager.update_standings()
 
         with open(filepath, "w") as file:
-            file.write(f"--- {self.now()} | Current Standings (Round {self.current_round} / {self.num_rounds}) ---\n")
+            file.write(f"--- {TournamentUtils.now()} | Current Standings (Round {current_round} / {num_rounds}) ---\n")
             file.write(f"{'Rank':<5} {'Player Name':<25} {'ELO':<6} {'Points':<7} {'Bye':<5} {'Present':<8} {'Color Bal.':<10}\n")
             file.write("-" * 80 + "\n")
             rank = 1
-            for player in self.players:
-                if player.id == 0 and player.name_surname == "BYE_OPPONENT":
-                    continue
-                bye_status = "Reg" if player.had_regular_bye else ("Half" if player.has_bye_this_round else "No")
+            display_players = [p for p in self.player_manager.players if not (p.id == 0 and p.name_surname == "BYE_OPPONENT")]
+            for player in display_players:
+                bye_status = "No"
+                if player.had_regular_bye:
+                    bye_status = "Reg"
+                if player.has_bye_this_round:
+                    bye_status = "Half" if not player.had_regular_bye else "Reg"
                 present_status = "Yes" if player.is_present else "No"
                 file.write(f"{rank:<5} {player.name_surname:<25} {player.elo:<6} {player.points:<7.1f} {bye_status:<5} {present_status:<8} {player.color_balance_counter:<10}\n")
                 rank += 1
             file.write("-" * 80 + "\n")
-        print(f"{self.now()} | Standings exported to {filepath}!")
+        print(f"{TournamentUtils.now()} | Standings exported to {filepath}!")
+
     def export_standings_to_csv(self, filepath: str = "standings.csv") -> None:
-        """Exports current standings to a CSV file."""
         os.makedirs(os.path.dirname(filepath) or '.', exist_ok=True)
-        self.update_standings() # Ensure standings are current
+        self.player_manager.update_standings()
         
         with open(filepath, "w", newline='') as file:
             fieldnames = ["Rank", "Player Name", "ELO", "Points", "Had Regular Bye", "Had Half Bye This Round", "Is Present", "Color Balance Counter"]
             writer = csv.DictWriter(file, fieldnames=fieldnames)
             writer.writeheader()
             rank = 1
-            for player in self.players:
-                if player.id == 0 and player.name_surname == "BYE_OPPONENT": # Do not export dummy BYE_OPPONENT
-                    continue
+            display_players = [p for p in self.player_manager.players if not (p.id == 0 and p.name_surname == "BYE_OPPONENT")]
+            for player in display_players:
                 writer.writerow({
                     "Rank": rank,
                     "Player Name": player.name_surname,
@@ -975,105 +976,235 @@ class Tournament:
                     "Color Balance Counter": player.color_balance_counter
                 })
                 rank += 1
-        print(f"{self.now()} | Standings exported to {filepath}!")
+        print(f"{TournamentUtils.now()} | Standings exported to {filepath}!")
 
-    def export_pairings_to_txt(self, filepath: str = "pairings.txt", round_number: int | None = None) -> None:
-        """Exports pairings to a TXT file."""
-        if round_number is None:
-            round_number = self.current_round
-        
-        matches_to_export = self.rounds_matches.get(round_number)
+    def export_pairings_to_txt(self, round_number: int, filepath: str = "pairings.txt") -> None:
+        matches_to_export = self.match_manager.get_matches_for_round(round_number)
         if not matches_to_export:
-            print(f"{self.now()} | No pairings found for Round {round_number} to export.")
+            print(f"{TournamentUtils.now()} | No pairings found for Round {round_number} to export.")
             return
 
         os.makedirs(os.path.dirname(filepath) or '.', exist_ok=True)
         with open(filepath, "w") as file:
-            file.write(f"--- {self.now()} | Tournament Pairings for Round {round_number} ---\n")
+            file.write(f"--- {TournamentUtils.now()} | Tournament Pairings for Round {round_number} ---\n")
             for match in matches_to_export:
-                file.write(str(match) + "\n") # Use __str__ of Match
+                file.write(str(match) + "\n")
             file.write("-" * 40 + "\n")
-        print(f"{self.now()} | Pairings for Round {round_number} exported to {filepath}!")
+        print(f"{TournamentUtils.now()} | Pairings for Round {round_number} exported to {filepath}!")
 
-    def save_tournament_state(self, players_filepath: str = "players_state.csv", matches_filepath: str = "matches.csv", meta_filepath: str = "tournament_meta.csv") -> None:
-        """
-        Saves the entire tournament state across multiple CSV files.
-        - players.csv: Player details
-        - matches.csv: All match details (including round number)
-        - tournament_meta.csv: Basic tournament metadata (current_round, num_rounds)
-        """
-        # Save Players
-        self.save_players_to_csv(players_filepath)
 
-        # Save Matches
-        os.makedirs(os.path.dirname(matches_filepath) or '.', exist_ok=True)
-        with open(matches_filepath, 'w', newline='') as f:
-            fieldnames = ["match_id", "round_number", "player_white_id", "player_black_id", "result", "is_bye_match", "is_half_bye_match"]
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            # Iterate through all matches in all rounds
-            for round_num in sorted(self.rounds_matches.keys()):
-                for match in self.rounds_matches[round_num]:
-                    writer.writerow(match.to_dict())
-        print(f"{self.now()} | Matches saved to {matches_filepath}!")
-
-        # Save Metadata
-        os.makedirs(os.path.dirname(meta_filepath) or '.', exist_ok=True)
-        with open(meta_filepath, 'w', newline='') as f:
-            fieldnames = ["current_round", "num_rounds", "next_player_id", "next_match_id_in_round_counter"]
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerow({
-                "current_round": self.current_round,
-                "num_rounds": self.num_rounds,
-                "next_player_id": self.next_player_id,
-                "next_match_id_in_round_counter": self.NEXT_MATCH_ID_IN_ROUND
-            })
-        print(f"{self.now()} | Tournament metadata saved to {meta_filepath}!")
-
-    def load_tournament_state(self, players_filepath: str = "players_state.csv", matches_filepath: str = "matches.csv", meta_filepath: str = "tournament_meta.csv") -> None:
-        """
-        Loads the entire tournament state from multiple CSV files.
-        """
-        # Load Metadata first
-        if os.path.exists(meta_filepath) and os.path.getsize(meta_filepath) > 0:
-            with open(meta_filepath, 'r', newline='') as f:
-                reader = csv.DictReader(f)
-                try:
-                    meta_data = next(reader)
-                    self.current_round = int(meta_data.get("current_round", 0))
-                    self.num_rounds = int(meta_data.get("num_rounds", 5))
-                    self.next_player_id = int(meta_data.get("next_player_id", 1))
-                    self.NEXT_MATCH_ID_IN_ROUND = int(meta_data.get("next_match_id_in_round_counter", 1))
-                    print(f"{self.now()} | Metadata loaded from {meta_filepath}!")
-                except (StopIteration, KeyError, ValueError) as e:
-                    print(f"{self.now()} | Error loading metadata from {meta_filepath}: {e}. Resetting tournament state.")
-                    self.__init__(self.num_rounds)
-                    return
-        else:
-            print(f"{self.now()} | No metadata file '{meta_filepath}' found. Initializing tournament defaults.")
-            self.__init__(self.num_rounds)
-            return
-
-        # Load Players
-        self.load_players_from_csv(players_filepath)
-        players_by_id = {p.id: p for p in self.players} # Create lookup for matches
-
-        # Load Matches
-        if os.path.exists(matches_filepath) and os.path.getsize(matches_filepath) > 0:
-            self.rounds_matches = {} # Clear existing matches before loading
-            with open(matches_filepath, 'r', newline='') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    try:
-                        match = Match.from_dict(row, players_by_id)
-                        # Add to rounds_matches based on its round_number
-                        self.rounds_matches.setdefault(match.round_number, []).append(match)
-                    except (KeyError, ValueError, TypeError) as e:
-                        print(f"{self.now()} | Error loading match from row {row}: {e}. Skipping match.")
-            print(f"{self.now()} | Matches loaded from {matches_filepath}!")
-        else:
-            print(f"{self.now()} | No match data file '{matches_filepath}' found. No matches loaded.")
-            self.rounds_matches = {}
+# --- Tournament (Main Controller) ---
+class Tournament:
+    """Main controller that coordinates all tournament operations."""
+    
+    def __init__(self, num_rounds: int = 5):
+        if not isinstance(num_rounds, int) or num_rounds <= 0:
+            raise ValueError("Number of rounds must be a positive integer.")
         
-        print(f"{self.now()} | Tournament state fully loaded!")
+        self.current_round = 0
+        self.num_rounds = num_rounds
+        
+        # Initialize all managers
+        self.player_manager = PlayerManager()
+        self.pairing_engine = PairingEngine(self.player_manager)
+        self.match_manager = MatchManager(self.player_manager, self.pairing_engine)
+        self.result_tracker = ResultTracker(self.match_manager, self.player_manager)
+        self.file_manager = FileManager(self.player_manager, self.match_manager)
+        self.display_manager = DisplayManager(self.player_manager, self.match_manager)
+
+    # Delegate methods to appropriate managers
+    def add_player(self, name_surname: str, elo: int, id: int = -1) -> None:
+        self.player_manager.add_player(name_surname, elo, id)
+
+    def get_player_by_name(self, name_surname: str) -> Optional[Player]:
+        return self.player_manager.get_player_by_name(name_surname)
+    
+    def get_player_by_id(self, player_id: int) -> Optional[Player]:
+        return self.player_manager.get_player_by_id(player_id)
+    
+    def toggle_player_presence(self, player_id: int) -> str:
+        return self.player_manager.toggle_player_presence(player_id)
+
+    def pair_round_random(self, round_number: int, players_for_pairing: List[Player]) -> List[Match]:
+        print(f"\n{TournamentUtils.long_line()}")
+        print(f"{TournamentUtils.now()} | Pairing Round {round_number} using RANDOM SYSTEM")
+        random.shuffle(players_for_pairing)
+        for i in range(0, len(players_for_pairing), 2):
+            player1 = players_for_pairing[i]
+            player2 = players_for_pairing[i+1]
+            self.match_manager.create_match(player1, player2, round_number)
+        return self.match_manager.get_matches_for_round(round_number)
+
+    def pair_round_by_elo(self, round_number: int, players_for_pairing: List[Player]) -> List[Match]:
+        print(f"\n{TournamentUtils.long_line()}")
+        print(f"{TournamentUtils.now()} | Pairing Round {round_number} BY ELO")
+        players_for_pairing.sort(key=lambda p: p.elo)
+        for i in range(0, len(players_for_pairing), 2):
+            player1 = players_for_pairing[i]
+            player2 = players_for_pairing[i+1]
+            if i % 4 == 0:
+                self.match_manager.create_match(player1, player2, round_number)
+            else:
+                self.match_manager.create_match(player2, player1, round_number)
+        return self.match_manager.get_matches_for_round(round_number)
+
+    def pair_round_matrix(self, round_number: int, players_for_pairing: List[Player], matrix_engine: PairingEngine | None = None) -> List[Match]:
+        print(f"\n{TournamentUtils.long_line()}")
+        print(f"{TournamentUtils.now()} | Pairing Round {round_number} using MATRIX SYSTEM")
+        players_for_pairing.sort(key=lambda p: (p.points, p.elo), reverse=True)
+        if matrix_engine is None:
+            matrix_engine = self.match_manager.pairing_engine
+
+        optimal_pairing_result = matrix_engine.find_optimal_pairing(players_for_pairing)
+        
+        matches: list[Match] = []
+        if optimal_pairing_result:
+            optimal_pairing_result = optimal_pairing_result[0]
+            for p1, p2 in optimal_pairing_result:
+                p1, p2 = matrix_engine.assign_colors_to_pair(p1, p2)
+                matches.append(self.match_manager.create_match(p1, p2, round_number))
+        
+        return matches
+
+    def pair_round(self, pairing_system: str) -> List[Match]:
+        if self.current_round >= self.num_rounds:
+            print(f"{TournamentUtils.now()} | Tournament has reached its maximum rounds ({self.num_rounds}). Cannot pair new round.")
+            return []
+
+        self.current_round += 1
+        self.match_manager.reset_match_id_counter()
+
+        print(f"\n{TournamentUtils.long_line()}")
+        print(f"{TournamentUtils.now()} | Pairing Round {self.current_round} / {self.num_rounds} using {pairing_system.upper()} system.")
+
+        # Reset has_bye_this_round for all players at the start of a new round
+        for p in self.player_manager.get_all_players():
+            p.has_bye_this_round = False
+
+        active_players = self.player_manager.get_active_players()
+        if len(active_players) < 2:
+            print(f"{TournamentUtils.now()} | Not enough active players ({len(active_players)}) to pair a round.")
+            return []
+
+        # Handle bye assignment for the round
+        bye_player, players_for_pairing = self.match_manager.handle_bye_assignment(active_players, self.current_round)
+        
+        if len(players_for_pairing) % 2 != 0:
+            raise RuntimeError(f"Internal error: Odd number of players ({len(players_for_pairing)}) remaining after bye assignment for pairing.")
+        
+        if not players_for_pairing:
+            print(f"{TournamentUtils.now()} | No players left to pair after bye assignment.")
+            return self.match_manager.get_matches_for_round(self.current_round)
+
+        # Perform Pairing based on System
+        match(pairing_system.lower()):
+            case "random":
+                return self.pair_round_random(self.current_round, players_for_pairing)
+            case "by elo":
+                return self.pair_round_by_elo(self.current_round, players_for_pairing)
+            case "matrix":
+                return self.pair_round_matrix(self.current_round, players_for_pairing)
+            # case "ducth" - we don't use no more
+            case _:
+                raise ValueError(f"Invalid pairing system: {pairing_system}")
+
+    def enter_result(self, match_id: int, result: str, round_num: Optional[int] = None) -> None:
+        if round_num is None:
+            self.result_tracker.enter_result(match_id, result, self.current_round)
+        self.result_tracker.enter_result(match_id, result, round_num)
+
+    def end_round(self) -> None:
+        print(f"\n{TournamentUtils.long_line()}")
+        print(f"{TournamentUtils.now()} | Ending Round {self.current_round} / {self.num_rounds}")
+
+        self.result_tracker.update_players_results(self.match_manager.get_matches_for_round(self.current_round))
+        
+        self.player_manager.update_standings()
+        print(f"{TournamentUtils.now()} | Round {self.current_round} / {self.num_rounds} ended.")
+        print(TournamentUtils.long_line())
+
+    def get_final_standings(self, top: Optional[int] = None)-> list[Player]:
+        return self.player_manager.get_final_standings(top)
+
+    def end_tournament(self, top: Optional[int] = None) -> None:
+        self.get_final_standings(top)
+        print(f"{TournamentUtils.now()} | Tournament ended. Standings exported to 'standings.txt' and 'standings.csv'")
+        
+    # Display methods
+    def print_standings(self, top: Optional[int] = None) -> None: # Changed default top to None
+        self.display_manager.print_standings(self.current_round, self.num_rounds, top)
+
+    def print_pairings(self, round_number: Optional[int] = None) -> None:
+        if round_number is None:
+            round_number = self.current_round
+        self.display_manager.print_pairings(round_number)
+
+    # Export methods
+    def export_standings_to_txt(self, filepath: str = "standings.txt", final: bool = False) -> None:
+        if final:
+            self.player_manager.players = self.player_manager.get_final_standings()
+        self.display_manager.export_standings_to_txt(self.current_round, self.num_rounds, filepath)
+
+    def export_standings_to_csv(self, filepath: str = "standings.csv", final: bool = False) -> None:
+        if final:
+            self.player_manager.players = self.player_manager.get_final_standings()
+        self.display_manager.export_standings_to_csv(filepath)
+
+    def export_pairings_to_txt(self, filepath: str = "pairings.txt", round_number: Optional[int] = None) -> None:
+        if round_number is None:
+            round_number = self.current_round
+        self.display_manager.export_pairings_to_txt(round_number, filepath)
+
+    # File I/O methods
+    def save_players_to_csv(self, filepath: str = "players.csv") -> None:
+        self.file_manager.save_players_to_csv(filepath)
+
+    def load_players_from_csv(self, filepath: str = "registered_players.csv", clear_players: bool = True) -> None:
+        self.file_manager.load_players_from_csv(filepath, clear_players)
+
+    def save_tournament_state(self, players_filepath: str = "players_state.csv", 
+                            matches_filepath: str = "matches.csv", 
+                            meta_filepath: str = "tournament_meta.csv") -> None:
+        self.player_manager.players = self.player_manager.get_final_standings()
+        self.file_manager.save_players_to_csv(players_filepath)
+        self.file_manager.save_matches_to_csv(matches_filepath)
+        self.file_manager.save_tournament_meta(
+            self.current_round, self.num_rounds, 
+            self.player_manager.next_player_id, 
+            self.match_manager.next_match_id_in_round, 
+            meta_filepath
+        )
+
+    def load_tournament_state(self, players_filepath: str = "players_state.csv", 
+                            matches_filepath: str = "matches.csv", 
+                            meta_filepath: str = "tournament_meta.csv") -> None:
+        # Load metadata first
+        meta_data = self.file_manager.load_tournament_meta(meta_filepath)
+        if meta_data:
+            self.current_round = meta_data["current_round"]
+            self.num_rounds = meta_data["num_rounds"]
+            self.player_manager.next_player_id = meta_data["next_player_id"]
+            self.match_manager.next_match_id_in_round = meta_data["next_match_id_in_round_counter"]
+            print(f"{TournamentUtils.now()} | Metadata loaded!")
+        else:
+            print(f"{TournamentUtils.now()} | Using default tournament settings.")
+
+        # Load players and matches
+        self.file_manager.load_players_from_csv(players_filepath)
+        self.file_manager.load_matches_from_csv(matches_filepath)
+        print(f"{TournamentUtils.now()} | Tournament state fully loaded!")
+
+    # Utility properties for backward compatibility
+    
+    @property
+    def players(self) -> List[Player]:
+        return self.player_manager.get_all_players()
+
+    @property
+    def current_matches(self) -> List[Match]:
+        # This property should reflect the matches for the current round
+        return self.match_manager.get_matches_for_round(self.current_round)
+
+    @property
+    def rounds_matches(self) -> Dict[int, List[Match]]:
+        return self.match_manager.rounds_matches

@@ -1,6 +1,0 @@
---- 24/07/25 20:35:17 | Tournament Pairings for Round 3 ---
-Match ID 1 (R3): Hikaru Nakamura (BYE) - Result: bye
-Match ID 2 (R3): Magnus Carlsen (W) vs Noah (B) - Result: 0.5-0.5
-Match ID 3 (R3): Diana (W) vs Alice (B) - Result: 1-0
-Match ID 4 (R3): Charlie (W) vs Bob (B) - Result: 0-1
-----------------------------------------

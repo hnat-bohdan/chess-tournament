@@ -14,13 +14,12 @@ A robust and feature-rich Python-based console application designed to manage Sw
 
     * Player data is persisted to and loaded from CSV files.
 
-* **Advanced Pairing Systems:**
+* **Pairing Systems:**
 
     * **Random Pairing:** Simple randomized pairings, typically used for the first round.
+    * **Pairing by ELO rating:** Simple  pairings based on ELO, typically used for the first round.
 
-    * [**Monrad System**](https://www.wikiwand.com/en/articles/Swiss-system_tournament#Monrad_system)**:** Players are paired based on points (descending) and then ELO (descending). It prioritizes adjacent pairings in the sorted list.
-
-    * [**Dutch System**](https://www.wikiwand.com/en/articles/Swiss-system_tournament#Dutch_system)**:** Players are paired based on points (descending) and then ELO (descending). It applies a penalty for pairing players from the same "half" (top vs. top, bottom vs. bottom) to encourage top-vs-bottom matches.
+    * [**Dutch System**](https://www.wikiwand.com/en/articles/Swiss-system_tournament#Dutch_system) (implemented in `DutchTournament`)
 
     >### Fast Acknowledgement
     >The core pairing algorithm and concepts for this Chess Tournament were inspired by and adapted from the excellent video on Swiss Tournament Pairing Algorithms by Nice Micro in his [video](https://youtu.be/ijU8kL4hgIg?si=H0vN8dk4TArI67-b) on YouTube.
@@ -37,10 +36,11 @@ A robust and feature-rich Python-based console application designed to manage Sw
     ### Algorithmic Complexity (Big O Notation)
 
     * **Badness Matrix Calculation (`_calculate_badness_matrix`):**
-        The time complexity for generating the badness matrix is **O(N^2 \* R)**, where `N` is the number of players and `R` is the number of rounds played. This is because it iterates through all possible pairs of players (`N^2`) and for each pair, it might check their `past_opponents` list (which can grow up to `R` in length). In practice, as `R` is typically small and constant, this often behaves closer to **O(N^2)**.
+        The time complexity for generating the badness matrix is **O(N^2 * R)**, where `N` is the number of players and `R` is the number of rounds played. This is because it iterates through all possible pairs of players (`N^2`) and for each pair, it might check their `past_opponents` list (which can grow up to `R` in length). In practice, as `R` is typically small and constant, this often behaves closer to **O(N^2)**.
 
     * **Pairing Algorithm (`_find_best_pairing_recursive`):**
-        This algorithm performs a combinatorial search for the optimal pairing. In the theoretical worst-case, the number of possible pairings grows factorially, leading to a complexity of approximately **O(N! \* N)**. However, the implementation uses aggressive **pruning** (alpha-beta pruning concept) and a `MATCH_ACCECPTABLE_BADNESS_LIMIT` heuristic. This significantly reduces the actual number of combinations explored, making it practically feasible for tournaments with up to **18-24 players**. For larger tournaments, different heuristic-based approaches would be required to achieve polynomial time complexity, but without guaranteeing absolute optimality.
+        This algorithm performs a combinatorial search for the optimal pairing. In the theoretical worst-case, the number of possible pairings grows factorially, leading to a complexity of approximately **O(N! * N)**. However, the implementation uses aggressive **pruning** (alpha-beta pruning concept) and a `MATCH_ACCECPTABLE_BADNESS_LIMIT` heuristic. This significantly reduces the actual number of combinations explored, making it practically feasible for tournaments with up to **18-24 players**. For larger tournaments, different heuristic-based approaches would be required to achieve polynomial time complexity, but without guaranteeing absolute optimality.
+    > Because of that in `DutchTournament` it used only for last players to avoid some bugs.
 
 * **Sophisticated Bye Handling:**
 
@@ -50,13 +50,10 @@ A robust and feature-rich Python-based console application designed to manage Sw
 
 * **Fair Color Balancing:**
 
-    * Intelligent assignment of White/Black pieces based on a `color_balance_counter` that tracks past color assignments.
+    * Intelligent assignment of White/Black pieces based on a `color_balance_counter` that tracks past color assignments:+1 if white, -1 if black.
+    * Prioritizes players who have a preference for a certain color (e.g., played more White, now prefers Black).
 
-    * Prioritizes players who have a strong preference for a certain color (e.g., played White twice in a row, now prefers Black).
-
-    * Further tie-breaking rules consider the total number of black games played, fewer points, and lower ELO.
-
-    * A bye (regular or half) resets a player's color preference counter.
+    * Further tie-breaking rules consider the fewer points and lower ELO.
 
 * **Tournament State Persistence:**
 
@@ -137,7 +134,7 @@ There are two ways to run the project:
 
     ```
 
-    This script will run a pre-defined 6-round tournament simulation with random results and specific player absences. It's useful for quickly seeing the system in action and generating example output files.
+    This script will run a pre-defined 10-round tournament simulation with random results and specific player absences. It's useful for quickly seeing the system in action and generating example output files.
 
 ## Usage (Interactive `main.py`)
 
@@ -149,13 +146,11 @@ When you run `main.py`, you will be prompted to:
 
 3.  You can then **add additional players** manually (as defined in the `players` dictionary in `main.py`).
 
-4.  The tournament will proceed round by round:
+4.  The tournament will proceed round by round, pairing players using the following methods:
 
     * **Round 1:** Uses **Random Pairing**.
 
-    * **Round 2:** Uses **Monrad System Pairing**.
-
-    * **Rounds 3 onwards (up to your specified `num_rounds`):** Use **Dutch System Pairing**.
+    * **Rounds 2 onwards (up to your specified `num_rounds`):** Use **Dutch System Pairing**.
 
 5.  For each match in a round, you will be prompted to **enter results** interactively:
 
@@ -190,9 +185,7 @@ You can fine-tune the pairing algorithm and player behavior by modifying constan
 * `Player.from_dict`: Handles robust loading of boolean values (e.g., `"True"`/`"False"` strings from CSV).
 
 ## Ideas for the new update
-* Creating ConsoleApp object to improve user experience
-* Creating different child Objects for Tournament: Robin Tournament, Single or More Elimination; pure Dutch Swiss and pure Monrad Swiss.
-* **Improving the pairing algorithm** so larger tournaments can be ran.
+* Creating different child Objects for Tournament: Robin Tournament, Single or More Elimination; pure Dutch Swiss.
 
 
 ## Contributing
