@@ -119,8 +119,8 @@ class Player:
         """
         player = cls(
             id=int(data["id"]),
-            name_surname=data["name_surname"],
-            elo=int(data["elo"])
+            name_surname=Player._name_surname_encoder(data["name_surname"]),
+            elo=Player._elo_encoder(data["elo"])
         )
         player.points = float(data["points"])
         player.past_colors = json.loads(data.get("past_colors", "[]"))
@@ -382,7 +382,9 @@ class PlayerManager:
                             continue
                         case _:
                             pass
-                players_and_avarage_opponent[player] = (math.fsum(opponents_points) * 2) / len(opponents_points) 
+                players_and_avarage_opponent[player] = 0.0
+                if opponents_points:
+                    players_and_avarage_opponent[player] = (math.fsum(opponents_points) * 2) / len(opponents_points) 
 
             #Sort the scoregroup by the sum of the opponents' points (descending), 
             players_and_avarage_opponent: list[tuple[Player, float]] = sorted(
@@ -1039,10 +1041,11 @@ class Tournament:
         print(f"\n{TournamentUtils.long_line()}")
         print(f"{TournamentUtils.now()} | Pairing Round {round_number} BY ELO")
         players_for_pairing.sort(key=lambda p: p.elo)
-        for i in range(0, len(players_for_pairing), 2):
+        mid = len(players_for_pairing) // 2
+        for i in range(0, len(players_for_pairing), 1):
             player1 = players_for_pairing[i]
-            player2 = players_for_pairing[i+1]
-            if i % 4 == 0:
+            player2 = players_for_pairing[i+mid]
+            if i % 2 == 0:
                 self.match_manager.create_match(player1, player2, round_number)
             else:
                 self.match_manager.create_match(player2, player1, round_number)

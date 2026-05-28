@@ -3,12 +3,7 @@ import os
 from typing import List, Tuple
 
 PREDEFINED_PLAYERS: dict[str, int] = {
-        # NAME : ELO
-        "Alice": 500,
-        "Bob": 400,
-        "Charlie": 600,
-        "Diana": 900,
-        "Noah": 1000, }
+        }
 
 # --- File Paths --- (Keep these at the top)
 REGISTERED_PLAYERS_CSV = "import/chess_players.csv"
@@ -266,7 +261,7 @@ def main() -> None:
                 pause_and_continue()
                 continue
 
-            # --- NEW PRE-PAIRING LOGIC ---
+            # --- PRE-PAIRING LOGIC ---
             # Step 1: Handle player presence
             if get_string_input("Do you want to change the presence of any players for this round? (y/n): ", ['y', 'n']) == 'y':
                 toggle_player_presence(tournament)
@@ -392,7 +387,7 @@ def main() -> None:
                     break
     
         elif choice == 9: # Exit
-            confirm_exit = input("Are you sure you want to exit? (y/n): ").lower()
+            confirm_exit = input("SAVE THE TOURNAMENT STATE BEFORE EXITING (option 8)\nAre you sure you want to exit? (y/n): ").lower()
             if confirm_exit == 'y':
                 print(f"{TournamentUtils.now()} | Exiting Chess Tournament Manager. Goodbye!")
                 break

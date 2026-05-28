@@ -181,8 +181,8 @@ class DutchTournament(Tournament):
     def pair_round_dutch(self, round_number: int, players_for_pairing: List[Player] ) -> List[Match]:
         """Pair a round using proper Dutch system with score groups."""
         
-        print(f"\n{TournamentUtils.long_line()}")
-        print(f"{TournamentUtils.now()} | Pairing Round {round_number} using DUTCH SYSTEM with Score Groups")
+        #print(f"\n{TournamentUtils.long_line()}")
+        #print(f"{TournamentUtils.now()} | Pairing Round {round_number} using DUTCH SYSTEM with Score Groups")
 
         
         # For small amount of players use uneficient old matrix pairing to prevent some bugs
@@ -193,9 +193,9 @@ class DutchTournament(Tournament):
         self.match_manager.pairing_engine.create_score_groups(players_for_pairing)
         score_groups = self.match_manager.pairing_engine.score_groups
         
-        print(f"{TournamentUtils.now()} | Created {len(score_groups)} score groups:")
-        for group in score_groups:
-            print(f"  {group}")
+        #print(f"{TournamentUtils.now()} | Created {len(score_groups)} score groups:")
+        #for group in score_groups:
+            #print(f"  {group}")
         
         # Phase 1: Pair within score groups
         all_pairs = []
@@ -203,7 +203,7 @@ class DutchTournament(Tournament):
             if i > 0:
                 group.unpaired_players.extend(score_groups[i-1].unpaired_players)
             if (len(self.players) // 2) - len(all_pairs)  < self.current_round:
-                # for last gruop we will use matrix algorithm to prevent some bugs
+                # for last gruops we will use matrix algorithm to prevent some bugs
                 if len(group.unpaired_players) < self.current_round * 2 and len(group.unpaired_players) < 15:
                     break
             if group.can_pair_internally():
@@ -221,7 +221,7 @@ class DutchTournament(Tournament):
         # Phase 3: Pair unpaired players using matrix algorithm (assigning colors embled)
         unpaired_after_dutch_logic = [p for p in players_for_pairing if p.id not in paired_player_ids and not p.has_bye_this_round]
         if unpaired_after_dutch_logic:
-            print(f"{TournamentUtils.now()} | Pairing unpaired players using matrix algorithm")
+            #print(f"{TournamentUtils.now()} | Pairing unpaired players using matrix algorithm")
             if len(unpaired_after_dutch_logic) > 20:
                 n = len(unpaired_after_dutch_logic) // 10
                 for i in range(n):

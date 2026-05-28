@@ -1,6 +1,16 @@
-id,name_surname,elo,points,past_colors,past_matches,past_opponents,had_regular_bye,has_bye_this_round,is_present
-1,Magnus Carlsen,2850,0,"[]","[]","[]",False,False,True
-2,Hikaru Nakamura,2800,0,"[]","[]","[]",False,False,True
-3,Rameshbabu Praggnanandhaa,2750,0,"[]","[]","[]",False,False,True
-4,Stockfish,3750,0,"[]","[]","[]",False,False,True
-
+id,name_surname,elo,points,past_colors,past_matches,past_opponents,had_regular_bye,has_bye_this_round,is_present,past_results
+1,Mario Romano ,Chess.com= 1537,0,[],[],[],FALSE,FALSE,TRUE,[]
+2,Marasti simone,1600,0,[],[],[],FALSE,FALSE,TRUE,[]
+3,Francesco Giovanni richeldi ,800,0,[],[],[],FALSE,FALSE,TRUE,[]
+4,Bohdan Hnatiuk,1000,0,[],[],[],FALSE,FALSE,TRUE,[]
+5,Lorenzo Magro,ELO fra...cos'é??,0,[],[],[],FALSE,FALSE,TRUE,[]
+6,Carlo Longo,Per me la 9 cipolle,0,[],[],[],FALSE,FALSE,FALSE,[]
+7,Saif islam souhil,120,0,[],[],[],FALSE,FALSE,FALSE,[]
+8,Gianluca Venturelli,1070,0,[],[],[],FALSE,FALSE,TRUE,[]
+9,Cristian antonioni ,120,0,[],[],[],FALSE,FALSE,TRUE,[]
+10,Mathias Avanzi,580,0,[],[],[],FALSE,FALSE,TRUE,[]
+11,Cristea Raul Stefan,800,0,[],[],[],FALSE,FALSE,TRUE,[]
+12,Alessandro Manalo,383,0,[],[],[],FALSE,FALSE,TRUE,[]
+13,Marco Ferrari,600/700 ,0,[],[],[],FALSE,FALSE,TRUE,[]
+14,Tommaso Drusiani ,100,0,[],[],[],FALSE,FALSE,TRUE,[]
+15,Elia Caselli ,100,0,[],[],[],FALSE,FALSE,TRUE,[]

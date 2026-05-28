@@ -80,22 +80,20 @@ if __name__ == "__main__":
                 tournament.enter_result(match.match_id, random_result, match.round_number)
         
         tournament.end_round()
-<<<<<<< HEAD
         tournament.print_standings()
         tournament.export_standings_to_txt(filepath=f"export/leaderboard/round_{round_num}_standings.txt")
-=======
 
     # --- Simulate Rounds 5-6: Dutch System ---
     for round_num in range(5, 7): # Rounds 5, 6
-        print(f"\n{Tournament().long_line()}")
-        print(f"{Tournament().now()} | SIMULATING ROUND {round_num}: DUTCH SYSTEM PAIRING")
+        print(f"\n{TournamentUtils.long_line()}")
+        print(f"{TournamentUtils.now()} | SIMULATING ROUND {round_num}: DUTCH SYSTEM PAIRING")
 
         # Example: Mark Karen as absent in Round 5
         if round_num == 5:
             absent_player_r5 = tournament.get_player_by_name("Karen")
             if absent_player_r5:
                 absent_player_r5.is_present = False
-                print(f"{Tournament().now()} | Player {absent_player_r5.name_surname} is marked as absent for this round.")
+                print(f"{TournamentUtils.now()} | Player {absent_player_r5.name_surname} is marked as absent for this round.")
         else:
             karen_player = tournament.get_player_by_name("Karen")
             if karen_player:
@@ -104,13 +102,12 @@ if __name__ == "__main__":
         tournament.pair_round("dutch")
         tournament.print_pairings()
 
-        print(f"\n{Tournament().now()} | Entering Random Results for Round {round_num}...")
+        print(f"\n{TournamentUtils.now()} | Entering Random Results for Round {round_num}...")
         for match in tournament.current_matches:
             if not match.is_bye_match:
                 results_options = ["1-0", "0-1", "0.5-0.5"]
                 random_result = random.choice(results_options)
                 tournament.enter_result(match.match_id, random_result, match.round_number)
->>>>>>> 6eeb67d4b8bc551eb502b8ef8eec9ef83b6c6307
         
     
 
@@ -154,13 +151,9 @@ if __name__ == "__main__":
     end = timeit.default_timer()
     print( f" | Total Execution Time: {end - start} for {len(tournament.players)} players and {tournament.num_rounds} rounds.")
  # --- Final Cleanup ---
-    """print(" | Cleaning up generated files...")
+    print(" | Cleaning up generated files...")
     for f in [PLAYERS_CSV, MATCHES_CSV, META_CSV, STANDINGS_CSV, "final_standings.csv", "final_pairings_round6.txt"]:
         if os.path.exists(f):
             os.remove(f)
             print(f"Cleaned up {f}")
-<<<<<<< HEAD
-    print(" Cleanup complete.")"""
-=======
-    print(f"{Tournament().now()} | Cleanup complete.")"""
->>>>>>> 6eeb67d4b8bc551eb502b8ef8eec9ef83b6c6307
+    print(f"{TournamentUtils.now()} | Cleanup complete.")
