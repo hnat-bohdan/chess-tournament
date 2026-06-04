@@ -1042,7 +1042,7 @@ class Tournament:
         print(f"{TournamentUtils.now()} | Pairing Round {round_number} BY ELO")
         players_for_pairing.sort(key=lambda p: p.elo)
         mid = len(players_for_pairing) // 2
-        for i in range(0, len(players_for_pairing), 1):
+        for i in range(0, mid, 1):
             player1 = players_for_pairing[i]
             player2 = players_for_pairing[i+mid]
             if i % 2 == 0:
