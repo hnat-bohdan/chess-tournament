@@ -1045,7 +1045,7 @@ class Tournament:
         for i in range(0, mid, 1):
             player1 = players_for_pairing[i]
             player2 = players_for_pairing[i+mid]
-            if i % 2 == 0:
+            if i < mid // 2:
                 self.match_manager.create_match(player1, player2, round_number)
             else:
                 self.match_manager.create_match(player2, player1, round_number)
@@ -1107,7 +1107,6 @@ class Tournament:
                 return self.pair_round_by_elo(self.current_round, players_for_pairing)
             case "matrix":
                 return self.pair_round_matrix(self.current_round, players_for_pairing)
-            # case "ducth" - we don't use no more
             case _:
                 raise ValueError(f"Invalid pairing system: {pairing_system}")
 

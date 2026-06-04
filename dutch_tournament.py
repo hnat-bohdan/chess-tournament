@@ -181,10 +181,6 @@ class DutchTournament(Tournament):
     def pair_round_dutch(self, round_number: int, players_for_pairing: List[Player] ) -> List[Match]:
         """Pair a round using proper Dutch system with score groups."""
         
-        #print(f"\n{TournamentUtils.long_line()}")
-        #print(f"{TournamentUtils.now()} | Pairing Round {round_number} using DUTCH SYSTEM with Score Groups")
-
-        
         # For small amount of players use uneficient old matrix pairing to prevent some bugs
         if len(players_for_pairing) < 10:
             return self.pair_round_matrix(round_number, players_for_pairing, self.match_manager.old_pairing_engine)
@@ -192,10 +188,6 @@ class DutchTournament(Tournament):
         # Create score groups from the remaining players
         self.match_manager.pairing_engine.create_score_groups(players_for_pairing)
         score_groups = self.match_manager.pairing_engine.score_groups
-        
-        #print(f"{TournamentUtils.now()} | Created {len(score_groups)} score groups:")
-        #for group in score_groups:
-            #print(f"  {group}")
         
         # Phase 1: Pair within score groups
         all_pairs = []
